@@ -27,13 +27,13 @@ const int FOUR_CAM = 0; // 4;
 const int FIFTH_CAM = 2; // 3;
 const int BACK_CAM = 5;
 
-
-string camLOutput = "Cam_L_Stream.avi";
-string camROutput = "Cam_R_Stream.avi";
-string camBOutput = "Cam_B_Stream.avi";
-string cam4Output = "Cam_4_Stream.avi";
-string cam5Output = "Cam_5_Stream.avi";
-string camResultOutput = "Cam_Result_Stream.avi";
+string videoPath = "videos";
+string camLOutput = videoPath + "/Cam_L_Stream.avi";
+string camROutput = videoPath + "/Cam_R_Stream.avi";
+string camBOutput = videoPath + "/Cam_B_Stream.avi";
+string cam4Output = videoPath + "/Cam_4_Stream.avi";
+string cam5Output = videoPath + "/Cam_5_Stream.avi";
+string camResultOutput = videoPath + "/Cam_Result_Stream.avi";
 
 // Distortion
 string H_File, IntrinsicBase_File, DistRight_File, IntrinsicRight_File, DistBase_File, IntrinsicLeft_File, DistLeft_File, IntrinsicFour_File, DistFour_File, IntrinsicFive_File, DistFive_File, IntrinsicSix_File, DistSix_File;
@@ -64,6 +64,7 @@ int stitch();
 int record();
 int stitchLive();
 int use360Camera();
+int recordSimple();
 cv::Point2f convert_pt(cv::Point2f point, int w, int h, int INV_FLAG, float F);
 cv::Mat rectlinearProject(Mat ImgToCalibrate, bool INV_FLAG, float F);
 int calibrateCamerasInternal(int cam);
@@ -77,6 +78,7 @@ int main() {
 	std::string MainMenu = "Welcome to Link's imaging module.\n"
 		"Press 's' to Sitch Live.\n"
 		"Press 'r' to Record and Stitch. \n"
+		"Press 'e' to Record Only. \n"
 		"Press 'f' to Show Test Frames.\n"
 		"Press 'c' for External Calibration.\n"
 		"Press 'i' for Internal Calibration.\n"
@@ -96,6 +98,11 @@ int main() {
 		if (optionSelected == 'r')
 		{
 			if (use360Camera() == 1)
+				return 0;
+		}
+		if (optionSelected == 'e')
+		{
+			if (recordSimple() == 1)
 				return 0;
 		}
 		if (optionSelected == 'f')
@@ -1233,6 +1240,135 @@ int use360Camera()
 
 	return 1;
 
+}
+
+int recordSimple() {
+
+	// Create blank image for instructions
+	cv::Mat directions_screen = cv::Mat(400, 300, CV_8UC3);
+	directions_screen.setTo(cv::Scalar(130, 120, 180));
+	putText(directions_screen, "Press on SPACE to Record!", cvPoint(30, 30),
+		FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(200, 200, 250), 1, CV_AA);
+
+	imshow("Directions Screen", directions_screen);
+	
+	// Get camera ready
+	cv::VideoCapture capB(BASE_CAM);
+	cv::VideoCapture capR(RIGHT_CAM);
+	cv::VideoCapture capL(LEFT_CAM);
+	cv::VideoCapture cap4(FOUR_CAM);
+	cv::VideoCapture cap5(FIFTH_CAM);
+	cv::VideoWriter outputVideoB, outputVideoL, outputVideoR, outputVideo4, outputVideo5;
+	capL.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
+	capL.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
+	capR.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
+	capR.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
+	capB.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
+	capB.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
+	cap4.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
+	cap4.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
+	cap5.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
+	cap5.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
+	int frameWidth = capL.get(CV_CAP_PROP_FRAME_WIDTH)*0.25;
+	int frameHeight = capL.get(CV_CAP_PROP_FRAME_HEIGHT)*0.25;
+	cv::Mat baseFrame, leftFrame, rightFrame, fourFrame, fiveFrame;
+	//uni settings 
+	double Brightness;
+	double Contrast;
+	double Saturation;
+	double Gain;
+
+	Brightness = capB.get(CV_CAP_PROP_BRIGHTNESS);
+	Contrast = capB.get(CV_CAP_PROP_CONTRAST);
+	Saturation = capB.get(CV_CAP_PROP_SATURATION);
+	Gain = capB.get(CV_CAP_PROP_GAIN);
+
+	cout << "Brightness: " << Brightness;
+	cout << "Contrast: " << Contrast;
+	cout << "Saturation: " << Saturation;
+	cout << "Gain: " << Gain;
+
+	capB.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
+	capL.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
+	capR.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
+	cap4.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
+	cap5.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
+
+	capB.set(CV_CAP_PROP_CONTRAST, Contrast);
+	capL.set(CV_CAP_PROP_CONTRAST, Contrast);
+	capR.set(CV_CAP_PROP_CONTRAST, Contrast);
+	cap4.set(CV_CAP_PROP_CONTRAST, Contrast);
+	cap5.set(CV_CAP_PROP_CONTRAST, Contrast);
+
+	capB.set(CV_CAP_PROP_SATURATION, Saturation);
+	capL.set(CV_CAP_PROP_SATURATION, Saturation);
+	capR.set(CV_CAP_PROP_SATURATION, Saturation);
+	cap4.set(CV_CAP_PROP_SATURATION, Saturation);
+	cap5.set(CV_CAP_PROP_SATURATION, Saturation);
+
+	capB.set(CV_CAP_PROP_GAIN, Gain);
+	capL.set(CV_CAP_PROP_GAIN, Gain);
+	capR.set(CV_CAP_PROP_GAIN, Gain);
+	cap4.set(CV_CAP_PROP_GAIN, Gain);
+	cap5.set(CV_CAP_PROP_GAIN, Gain);
+
+	cv::Mat imageBSrc, imageBDst, imageRSrc, imageRDst, imageLSrc, image4Src, image4Dst, image5Src, image5Dst, imageLDst, image6Dst, image6Src;
+	cv::Mat outLeftFrame, outRightFrame, outBaseFrame, outFourFrame, outFiveFrame, outSixFrame;
+	outLeftFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
+	outRightFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
+	outBaseFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
+	outFourFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
+	outFiveFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
+	outSixFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
+	cv::gpu::Stream streamL, streamR, streamB, stream4, stream5, stream6;
+	outputVideoL.open(camLOutput, -1, 30, cv::Size(frameHeight, frameWidth), true);
+	outputVideoR.open(camROutput, -1, 30, cv::Size(frameHeight, frameWidth), true);
+	outputVideoB.open(camBOutput, -1, 30, cv::Size(frameHeight, frameWidth), true);
+	outputVideo4.open(cam4Output, -1, 30, cv::Size(frameHeight, frameWidth), true);
+	outputVideo5.open(cam5Output, -1, 30, cv::Size(frameHeight, frameWidth), true);
+
+	while (1) {
+		capB >> baseFrame;
+		capR >> rightFrame;
+		capL >> leftFrame;
+		cap4 >> fourFrame;
+		cap5 >> fiveFrame;
+
+		resize(leftFrame, leftFrame, cv::Size(frameWidth, frameHeight));
+		resize(baseFrame, baseFrame, cv::Size(frameWidth, frameHeight));
+		resize(rightFrame, rightFrame, cv::Size(frameWidth, frameHeight));
+		resize(fourFrame, fourFrame, cv::Size(frameWidth, frameHeight));
+		resize(fiveFrame, fiveFrame, cv::Size(frameWidth, frameHeight));
+		//resize(sixFrame, sixFrame, cv::Size(frameWidth, frameHeight));
+		cv::transpose(baseFrame, baseFrame);
+		cv::transpose(rightFrame, rightFrame);
+		cv::transpose(leftFrame, leftFrame);
+		cv::transpose(fourFrame, fourFrame);
+		cv::transpose(fiveFrame, fiveFrame);
+		//cv::transpose(sixFrame, sixFrame);
+		cv::flip(baseFrame, baseFrame, 1);
+		cv::flip(rightFrame, rightFrame, 1);
+		cv::flip(leftFrame, leftFrame, 1);
+		cv::flip(fourFrame, fourFrame, 1);
+		cv::flip(fiveFrame, fiveFrame, 1);
+
+		outputVideoL << leftFrame;
+		outputVideoR << rightFrame;
+		outputVideoB << baseFrame;
+		outputVideo4 << fourFrame;
+		outputVideo5 << fiveFrame;
+
+		imshow("Base", baseFrame);
+		imshow("Right", rightFrame);
+		imshow("Left", leftFrame);
+		imshow("Four", fourFrame);
+		imshow("Five", fiveFrame);
+
+		if (waitKey(30) == ' ')
+			break;
+	}
+
+	return 1;
 }
 
 int record()
