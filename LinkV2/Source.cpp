@@ -28,6 +28,9 @@ const int FIFTH_CAM = 2; // 3;
 const int BACK_CAM = 5;
 
 string videoPath = "videos";
+string calibrationPath = "calibration";
+string internalCalibrationPath = calibrationPath + "/internal";
+string externalCalibrationPath = calibrationPath + "/external";
 string camLOutput = videoPath + "/Cam_L_Stream.avi";
 string camROutput = videoPath + "/Cam_R_Stream.avi";
 string camBOutput = videoPath + "/Cam_B_Stream.avi";
@@ -138,16 +141,16 @@ void setup()
 	CAM_F_MAP[FIFTH_CAM] = 175.2695;
 	//CAM_F_MAP[BACK_CAM] = 175.2695;
 
-	IntrinsicBase_File = "intrinsic-base.txt";
-	DistBase_File = "distortion-base.txt";
-	IntrinsicRight_File = "intrinsic-right.txt";
-	DistRight_File = "distortion-right.txt";
-	IntrinsicLeft_File = "intrinsic-left.txt";
-	DistLeft_File = "distortion-left.txt";
-	IntrinsicFour_File = "intrinsic-four.txt";
-	DistFour_File = "distortion-four.txt";
-	IntrinsicFive_File = "intrinsic-five.txt";
-	DistFive_File = "distortion-five.txt";
+	IntrinsicBase_File = internalCalibrationPath + "/intrinsic-base.txt";
+	DistBase_File = internalCalibrationPath + "/distortion-base.txt";
+	IntrinsicRight_File = internalCalibrationPath + "/intrinsic-right.txt";
+	DistRight_File = internalCalibrationPath + "/distortion-right.txt";
+	IntrinsicLeft_File = internalCalibrationPath + "/intrinsic-left.txt";
+	DistLeft_File = internalCalibrationPath + "/distortion-left.txt";
+	IntrinsicFour_File = internalCalibrationPath + "/intrinsic-four.txt";
+	DistFour_File = internalCalibrationPath + "/distortion-four.txt";
+	IntrinsicFive_File = internalCalibrationPath + "/intrinsic-five.txt";
+	DistFive_File = internalCalibrationPath + "/distortion-five.txt";
 	//IntrinsicSix_File = "intrinsic-six.txt";
 	//DistSix_File = "distortion-six.txt";
 
@@ -176,10 +179,10 @@ void setup()
 	//file.open(DistSix_File, FileStorage::READ);
 	//file["Distortion Matrix"] >> sixDistCoeffs;
 
-	H_R = "H-right.txt";
-	H_L = "H-left.txt";
-	H_4 = "H-four.txt";
-	H_5 = "H-five.txt";
+	H_R = externalCalibrationPath + "/H-right.txt";
+	H_L = externalCalibrationPath + "/H-left.txt";
+	H_4 = externalCalibrationPath + "/H-four.txt";
+	H_5 = externalCalibrationPath + "/H-five.txt";
 	//H_6 = "H-six.txt";
 
 	//Find scene information 
