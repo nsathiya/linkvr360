@@ -16,6 +16,7 @@
 #include <opencv2/highgui/highgui_c.h>
 #include "opencv2/imgproc/imgproc_c.h"
 #include "opencv2/nonfree/nonfree.hpp"
+#include "ImageOps.h"
 
 using namespace std;
 using namespace cv;
@@ -26,6 +27,7 @@ const int RIGHT_CAM = 3; // 1;
 const int FOUR_CAM = 0; // 4;
 const int FIFTH_CAM = 2; // 3;
 const int BACK_CAM = 5;
+const int NO_OF_CAMS = 5;
 
 string videoPath = "videos";
 string calibrationPath = "calibration";
@@ -68,6 +70,7 @@ int record();
 int stitchLive();
 int use360Camera();
 int recordSimple();
+int testingFunction();
 cv::Point2f convert_pt(cv::Point2f point, int w, int h, int INV_FLAG, float F);
 cv::Mat rectlinearProject(Mat ImgToCalibrate, bool INV_FLAG, float F);
 int calibrateCamerasInternal(int cam);
@@ -85,7 +88,8 @@ int main() {
 		"Press 'f' to Show Test Frames.\n"
 		"Press 'c' for External Calibration.\n"
 		"Press 'i' for Internal Calibration.\n"
-		"Press 'g' for B&W/Color mode switching.\n Current mode is Color";
+		"Press 'g' for B&W/Color mode switching.\n Current mode is Color. \n"
+		"Press 't' for testing function.\n";
 	std::cout << MainMenu << std::endl;
 
 	while (1)
@@ -127,6 +131,10 @@ int main() {
 			/// JH: Control grayScale option enable/ disable
 			useGrayScale = !useGrayScale;
 			std::cout << "Color Mode is " << (useGrayScale ? "B&W" : "Color") << std::endl;
+		}
+		else if (optionSelected == 't') {
+			if (testingFunction() == 1)
+				return 0;
 		}
 	}
 }
@@ -881,8 +889,6 @@ int stitchLive()
 		gpu::warpPerspective(imageBSrc, resultB, trans, cv::Size(resultHeight + 600, resultWidth), 1, 0, cv::Scalar(), streamB);
 		streamB.waitForCompletion();
 		
-
-
 		/*
 		gpu::absdiff(result5, resultL, result5, stream5);
 		gpu::absdiff(result5, resultB, result5, stream5);
@@ -1245,6 +1251,783 @@ int use360Camera()
 
 }
 
+int testingFunction() {
+	
+	cout << "Stitching... \n" << endl;
+	cv::VideoCapture capL(LEFT_CAM), capB(BASE_CAM), capR(RIGHT_CAM), cap4(FOUR_CAM), cap5(FIFTH_CAM), cap6(BACK_CAM);
+
+	cv::VideoWriter outputVideo;
+	cv::Mat result, leftFrame, baseFrame, rightFrame, fourFrame, fiveFrame, sixFrame;
+	cv::Mat undistortedLeftFrame, undistortedBaseFrame, undistortedRightFrame, undistortedFourFrame, undistortedFiveFrame, undistortedSixFrame;
+
+	gpu::GpuMat resultL, resultB, resultR, resultMask, result4, result5, result6;
+	std::vector<cv::Point2f> scene_cornersLeft, scene_cornersRight, scene_cornersBase, scene_cornersFour, scene_cornersFive, scene_cornersSix, scene_corners;
+	capL.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
+	capL.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
+	capR.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
+	capR.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
+	capB.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
+	capB.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
+	cap4.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
+	cap4.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
+	cap5.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
+	cap5.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
+	cap6.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
+	cap6.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
+
+	double Brightness;
+	double Contrast;
+	double Saturation;
+	double Gain;
+
+	Brightness = capB.get(CV_CAP_PROP_BRIGHTNESS);
+	Contrast = capB.get(CV_CAP_PROP_CONTRAST);
+	Saturation = capB.get(CV_CAP_PROP_SATURATION);
+	Gain = capB.get(CV_CAP_PROP_GAIN);
+
+	cout << "Brightness: " << Brightness;
+	cout << "Contrast: " << Contrast;
+	cout << "Saturation: " << Saturation;
+	cout << "Gain: " << Gain;
+
+	capB.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
+	capL.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
+	capR.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
+	cap4.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
+	cap5.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
+
+	capB.set(CV_CAP_PROP_CONTRAST, Contrast);
+	capL.set(CV_CAP_PROP_CONTRAST, Contrast);
+	capR.set(CV_CAP_PROP_CONTRAST, Contrast);
+	cap4.set(CV_CAP_PROP_CONTRAST, Contrast);
+	cap5.set(CV_CAP_PROP_CONTRAST, Contrast);
+
+	capB.set(CV_CAP_PROP_SATURATION, Saturation);
+	capL.set(CV_CAP_PROP_SATURATION, Saturation);
+	capR.set(CV_CAP_PROP_SATURATION, Saturation);
+	cap4.set(CV_CAP_PROP_SATURATION, Saturation);
+	cap5.set(CV_CAP_PROP_SATURATION, Saturation);
+
+	capB.set(CV_CAP_PROP_GAIN, Gain);
+	capL.set(CV_CAP_PROP_GAIN, Gain);
+	capR.set(CV_CAP_PROP_GAIN, Gain);
+	cap4.set(CV_CAP_PROP_GAIN, Gain);
+	cap5.set(CV_CAP_PROP_GAIN, Gain);
+
+
+	int frameWidth = capL.get(CV_CAP_PROP_FRAME_WIDTH)*0.25;
+	int frameHeight = capL.get(CV_CAP_PROP_FRAME_HEIGHT)*0.25;
+	int resultWidth = frameHeight * 2;
+	int resultHeight = frameWidth + 100;
+	bool record = false;
+	resultL = gpu::GpuMat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
+	resultR = gpu::GpuMat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
+	resultB = gpu::GpuMat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
+	result4 = gpu::GpuMat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
+	result5 = gpu::GpuMat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
+	result6 = gpu::GpuMat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
+	result = Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
+
+	// Move Scene to the right by 100
+	int x_offset = 500;
+	float y_offset = 0.0;
+	float z_offset = 100.0;
+	float transdata[] = { 1.0, 0.0, x_offset, 0.0, 1.0, y_offset, 0.0, 0.0, 1.0 };
+	cv::Mat trans(3, 3, CV_32FC1, transdata);
+	cout << "HR: " << HR << endl;
+
+	Mat HR_m = HR.clone();
+	Mat HL_m = HL.clone();
+	HR = trans * HR;
+	HL = trans * HL;
+	H4 = trans * HR_m * H4;
+	H5 = trans * HL_m * H5;
+	//H6 = trans * HL_m * H5 * H6;
+
+	cout << "finished getting matrix" << endl;
+
+	capL.read(leftFrame);
+	capR.read(rightFrame);
+	capB.read(baseFrame);
+	cap4.read(fourFrame);
+	cap5.read(fiveFrame);
+	//cap6.read(sixFrame);
+
+
+	if (fiveFrame.cols == 0) {
+		cout << "Error reading file " << endl;
+		return -1;
+	}
+	resize(leftFrame, leftFrame, cv::Size(frameWidth, frameHeight));
+	resize(baseFrame, baseFrame, cv::Size(frameWidth, frameHeight));
+	resize(rightFrame, rightFrame, cv::Size(frameWidth, frameHeight));
+	resize(fourFrame, fourFrame, cv::Size(frameWidth, frameHeight));
+	resize(fiveFrame, fiveFrame, cv::Size(frameWidth, frameHeight));
+	//resize(sixFrame, sixFrame, cv::Size(frameWidth, frameHeight));
+
+	cv::transpose(baseFrame, baseFrame);
+	cv::transpose(rightFrame, rightFrame);
+	cv::transpose(leftFrame, leftFrame);
+	cv::transpose(fourFrame, fourFrame);
+	cv::transpose(fiveFrame, fiveFrame);
+	//cv::transpose(sixFrame, sixFrame);
+	cv::flip(baseFrame, baseFrame, 1);
+	cv::flip(rightFrame, rightFrame, 1);
+	cv::flip(leftFrame, leftFrame, 1);
+	cv::flip(fourFrame, fourFrame, 1);
+	cv::flip(fiveFrame, fiveFrame, 1);
+	//cv::flip(sixFrame, sixFrame, 1);
+	undistort(leftFrame, undistortedLeftFrame, leftIntrinsic, leftDistCoeffs);
+	undistort(baseFrame, undistortedBaseFrame, baseIntrinsic, baseDistCoeffs);
+	undistort(rightFrame, undistortedRightFrame, rightIntrinsic, rightDistCoeffs);
+	undistort(fourFrame, undistortedFourFrame, fourIntrinsic, fourDistCoeffs);
+	undistort(fiveFrame, undistortedFiveFrame, fiveIntrinsic, fiveDistCoeffs);
+	//undistort(sixFrame, undistortedSixFrame, sixIntrinsic, sixDistCoeffs);
+	leftFrame = undistortedLeftFrame;
+	baseFrame = undistortedBaseFrame;
+	rightFrame = undistortedRightFrame;
+	fourFrame = undistortedFourFrame;
+	fiveFrame = undistortedFiveFrame;
+	//sixFrame = undistortedSixFrame;
+
+	// Use the Homography Matrix to warp the images
+	scene_corners.clear();
+	scene_cornersLeft.push_back(Point2f(0.0, 0.0));
+	scene_cornersLeft.push_back(Point2f(leftFrame.cols, 0.0));
+	scene_cornersLeft.push_back(Point2f(0.0, leftFrame.rows));
+	scene_cornersLeft.push_back(Point2f(leftFrame.cols, leftFrame.rows));
+	scene_cornersRight.push_back(Point2f(0.0, 0.0));
+	scene_cornersRight.push_back(Point2f(rightFrame.cols, 0.0));
+	scene_cornersRight.push_back(Point2f(0.0, rightFrame.rows));
+	scene_cornersRight.push_back(Point2f(rightFrame.cols, leftFrame.rows));
+	scene_cornersBase.push_back(Point2f(0.0, 0.0));
+	scene_cornersBase.push_back(Point2f(baseFrame.cols, 0.0));
+	scene_cornersBase.push_back(Point2f(0.0, baseFrame.rows));
+	scene_cornersBase.push_back(Point2f(baseFrame.cols, baseFrame.rows));
+	scene_cornersFour.push_back(Point2f(0.0, 0.0));
+	scene_cornersFour.push_back(Point2f(fourFrame.cols, 0.0));
+	scene_cornersFour.push_back(Point2f(0.0, fourFrame.rows));
+	scene_cornersFour.push_back(Point2f(fourFrame.cols, fourFrame.rows));
+	scene_cornersFive.push_back(Point2f(0.0, 0.0));
+	scene_cornersFive.push_back(Point2f(fiveFrame.cols, 0.0));
+	scene_cornersFive.push_back(Point2f(0.0, fiveFrame.rows));
+	scene_cornersFive.push_back(Point2f(fiveFrame.cols, fiveFrame.rows));
+	//scene_cornersSix.push_back(Point2f(0.0, 0.0));
+	//scene_cornersSix.push_back(Point2f(sixFrame.cols, 0.0));
+	//scene_cornersSix.push_back(Point2f(0.0, sixFrame.rows));
+	//scene_cornersSix.push_back(Point2f(sixFrame.cols, sixFrame.rows));
+
+	perspectiveTransform(scene_cornersBase, scene_cornersBase, trans);
+	perspectiveTransform(scene_cornersLeft, scene_cornersLeft, HL);
+	perspectiveTransform(scene_cornersRight, scene_cornersRight, HR);
+	perspectiveTransform(scene_cornersFour, scene_cornersFour, H4);
+	perspectiveTransform(scene_cornersFive, scene_cornersFive, H5);
+	//perspectiveTransform(scene_cornersSix, scene_cornersSix, H6);
+
+
+	//Store useful information for Image limits
+	int leftLimit, baseLeftLimit, baseRightLimit, rightLimit, fourLimit, fifthLimit, sixLimit;
+
+	fifthLimit = scene_cornersFive[1].x;
+	//sixLimit = scene_cornersSix[1].x;
+	leftLimit = scene_cornersLeft[1].x;
+	baseLeftLimit = x_offset;
+	baseRightLimit = x_offset + baseFrame.cols;
+	rightLimit = scene_cornersRight[0].x;
+	fourLimit = scene_cornersFour[0].x;
+	Mat croppedImage;
+
+	//for cropping final result PLEASE REDO
+	cv::Point topLeft, topRight, bottomLeft, bottomRight;
+	int bottomLowerHeight, rightSmallerWidth, croppedWidth, croppedHeight;
+	topLeft.y = scene_cornersFive[0].y;
+	topLeft.x = scene_cornersFive[0].x;
+	topRight.y = scene_cornersFour[1].y;
+	topRight.x = scene_cornersFour[1].x;
+	bottomLeft.y = scene_cornersFive[2].y;
+	bottomLeft.x = scene_cornersFive[2].x;
+	bottomRight.y = scene_cornersFour[3].y;
+	bottomRight.x = scene_cornersFour[3].x;
+
+	if (topLeft.y < 0)
+		topLeft.y = 0;
+	if (topLeft.x < 0)
+		topLeft.x = 0;
+	if (topRight.y < 0)
+		topRight.y = 0;
+	if (topRight.x > result.cols)
+		topRight.x = result.cols;
+	if (bottomRight.y > result.rows)
+		bottomRight.y = result.rows;
+	if (bottomRight.x > result.cols)
+		bottomRight.x = result.cols;
+	if (bottomLeft.y > result.rows)
+		bottomLeft.y = result.rows;
+	if (bottomLeft.x < 0)
+		bottomLeft.x = 0;
+
+	(bottomLeft.y < bottomRight.y) ? bottomLowerHeight = bottomLeft.y : bottomLowerHeight = bottomRight.y;
+	(topRight.x < bottomRight.x) ? rightSmallerWidth = topRight.x : rightSmallerWidth = bottomRight.x;
+	(topLeft.x < bottomLeft.x) ? topLeft.x = bottomLeft.x : topLeft.x = topLeft.x;
+	(topLeft.y < topRight.y) ? topLeft.y = topRight.y : topLeft.y = topLeft.y;
+	croppedWidth = rightSmallerWidth - topLeft.x;
+	croppedHeight = bottomLowerHeight - topLeft.y;
+
+	//Timer Info
+	int _frequency = getTickFrequency();
+	float _secsPerCycle = (float)1 / _frequency;
+	int frameNo = 0;
+	float _totalSPF = 0;
+
+	//Get GPU ready
+	cv::gpu::setDevice(0);
+	cv::Mat tmp;
+	capL.read(tmp);
+	cv::gpu::GpuMat templ_d(tmp); // Warm up the cores
+
+	//Initialize needed variables for GPU
+	cv::gpu::GpuMat imageBSrc, imageBDst, imageRSrc, imageRDst, imageLSrc, image4Src, image4Dst, image5Src, image5Dst, imageLDst, image6Dst, image6Src;
+	cv::Mat outLeftFrame, outRightFrame, outBaseFrame, outFourFrame, outFiveFrame, outSixFrame;
+	outLeftFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
+	outRightFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
+	outBaseFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
+	outFourFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
+	outFiveFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
+	outSixFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
+
+	cv::Mat middlewareLeftFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
+	cv::Mat middlewareRightFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
+	cv::Mat middlewareBaseFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
+	cv::Mat middlewareFourFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
+	cv::Mat middlewareFiveFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
+	cv::Mat middlewareSixFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
+	cv::gpu::Stream streamL, streamR, streamB, stream4, stream5, stream6;
+
+	//Start processing
+	while (1)
+	{
+		frameNo++;
+		int _startWhileLoop = (int)getTickCount();
+		capL.read(leftFrame);
+		capR.read(rightFrame);
+		capB.read(baseFrame);
+		cap4.read(fourFrame);
+		cap5.read(fiveFrame);
+		//cap6.read(sixFrame);
+
+#ifdef ForceColorPixels	
+		cv::circle(baseFrame, cv::Point(frameWidth / 2, frameHeight / 2), 5, cv::Scalar(0, 255, 0), 2);
+		cv::circle(rightFrame, cv::Point(frameWidth / 2, frameHeight / 2), 5, cv::Scalar(0, 255, 0), 2);
+		cv::circle(leftFrame, cv::Point(frameWidth / 2, frameHeight / 2), 5, cv::Scalar(0, 255, 0), 2);
+		cv::circle(fourFrame, cv::Point(frameWidth / 2, frameHeight / 2), 5, cv::Scalar(0, 255, 0), 2);
+		cv::circle(fiveFrame, cv::Point(frameWidth / 2, frameHeight / 2), 5, cv::Scalar(0, 255, 0), 2);
+#endif
+
+		//imshow("base Frame", baseFrame);
+		if (useGrayScale) {
+			cvtColor(rightFrame, rightFrame, CV_RGB2GRAY);
+			cvtColor(baseFrame, baseFrame, CV_RGB2GRAY);
+			//imshow("test Frame", baseFrame);
+			cvtColor(leftFrame, leftFrame, CV_RGB2GRAY);
+			cvtColor(fourFrame, fourFrame, CV_RGB2GRAY);
+			cvtColor(fiveFrame, fiveFrame, CV_RGB2GRAY);
+			//cvtColor(sixFrame, sixFrame, CV_RGB2GRAY);
+		}
+		else {
+			cv::Mat rrr;
+			cvtColor(rightFrame, rrr, CV_RGB2BGR);
+			rightFrame = rrr.clone();
+			cvtColor(baseFrame, rrr, CV_RGB2BGR);
+			baseFrame == rrr.clone();
+			//imshow("test Frame", baseFrame);
+			cvtColor(leftFrame, rrr, CV_RGB2BGR);
+			leftFrame = rrr.clone();
+			cvtColor(fourFrame, rrr, CV_RGB2BGR);
+			fourFrame = rrr.clone();
+			cvtColor(fiveFrame, rrr, CV_RGB2BGR);
+			fiveFrame = rrr.clone();
+
+		}
+
+		resize(leftFrame, leftFrame, cv::Size(frameWidth, frameHeight));
+		resize(baseFrame, baseFrame, cv::Size(frameWidth, frameHeight));
+		resize(rightFrame, rightFrame, cv::Size(frameWidth, frameHeight));
+		resize(fourFrame, fourFrame, cv::Size(frameWidth, frameHeight));
+		resize(fiveFrame, fiveFrame, cv::Size(frameWidth, frameHeight));
+		//resize(sixFrame, sixFrame, cv::Size(frameWidth, frameHeight));
+		cv::transpose(baseFrame, baseFrame);
+		cv::transpose(rightFrame, rightFrame);
+		cv::transpose(leftFrame, leftFrame);
+		cv::transpose(fourFrame, fourFrame);
+		cv::transpose(fiveFrame, fiveFrame);
+		//cv::transpose(sixFrame, sixFrame);
+		cv::flip(baseFrame, baseFrame, 1);
+		cv::flip(rightFrame, rightFrame, 1);
+		cv::flip(leftFrame, leftFrame, 1);
+		cv::flip(fourFrame, fourFrame, 1);
+		cv::flip(fiveFrame, fiveFrame, 1);
+		//cv::flip(sixFrame, sixFrame, 1);
+		undistort(leftFrame, undistortedLeftFrame, leftIntrinsic, leftDistCoeffs);
+		undistort(baseFrame, undistortedBaseFrame, baseIntrinsic, baseDistCoeffs);
+		undistort(rightFrame, undistortedRightFrame, rightIntrinsic, rightDistCoeffs);
+		undistort(fourFrame, undistortedFourFrame, fourIntrinsic, fourDistCoeffs);
+		undistort(fiveFrame, undistortedFiveFrame, fiveIntrinsic, fiveDistCoeffs);
+		//undistort(sixFrame, undistortedSixFrame, sixIntrinsic, sixDistCoeffs);
+
+		cv::Mat rectLinearBaseFrame = rectlinearProject(undistortedBaseFrame, 0, CAM_F_MAP[BASE_CAM]);
+		cv::Mat rectLinearRightFrame = rectlinearProject(undistortedRightFrame, 0, CAM_F_MAP[RIGHT_CAM]);
+		cv::Mat rectLinearLeftFrame = rectlinearProject(undistortedLeftFrame, 0, CAM_F_MAP[LEFT_CAM]);
+		cv::Mat rectLinearFourFrame = rectlinearProject(undistortedFourFrame, 0, CAM_F_MAP[FOUR_CAM]);
+		cv::Mat rectLinearFiveFrame = rectlinearProject(undistortedFiveFrame, 0, CAM_F_MAP[FIFTH_CAM]);
+		//cv::Mat rectLinearSixFrame = rectlinearProject(undistortedSixFrame, 0, CAM_F_MAP[BACK_CAM]);
+
+		baseFrame = rectLinearBaseFrame;
+		leftFrame = rectLinearLeftFrame;
+		rightFrame = rectLinearRightFrame;
+		fourFrame = rectLinearFourFrame;
+		fiveFrame = rectLinearFiveFrame;
+#ifdef DEBUG_IMAGES
+		cv::imshow("0", baseFrame);
+		cv::imshow("1", leftFrame);
+		cv::imshow("2", rightFrame);
+		cv::imshow("3", fourFrame);
+		cv::imshow("4", fiveFrame);
+		cv::waitKey(0);
+#endif
+
+
+
+
+#ifdef DEBUG_INFO
+		cv::imshow("OUTFIVEFRAMEafter upload", fourFrame);
+#endif
+		//sixFrame = rectLinearSixFrame;
+
+		//Upload back to GPU
+
+		streamB.enqueueUpload(baseFrame, imageBSrc);
+		streamB.waitForCompletion();
+#ifdef DEBUG_IMAGES
+		cv::imshow("fourFrame before", fourFrame);
+		cv::waitKey(10);
+#endif
+		stream4.enqueueUpload(fourFrame, image4Src);
+		stream4.waitForCompletion();
+
+
+
+		stream5.enqueueUpload(fiveFrame, image5Src);
+		stream5.waitForCompletion();
+
+
+
+		streamL.enqueueUpload(leftFrame, imageLSrc);
+		streamL.waitForCompletion();
+		streamR.enqueueUpload(rightFrame, imageRSrc);
+		streamR.waitForCompletion();
+
+#ifdef DEBUG_IMAGES
+		/*stream5.enqueueDownload(result5, outFiveFrame);
+		stream5.waitForCompletion();
+		streamL.enqueueDownload(resultL, outLeftFrame);
+		streamL.waitForCompletion();
+		streamR.enqueueDownload(resultR, outRightFrame);
+		streamR.waitForCompletion();
+		streamB.enqueueDownload(resultB, outBaseFrame);
+		streamB.waitForCompletion();
+		stream4.enqueueDownload(result4, outFourFrame);
+		stream4.waitForCompletion();*/
+#endif
+
+		//stream6.enqueueUpload(sixFrame, image6Src);
+
+		/*
+		//Warp Perspective
+		gpu::warpPerspective(imageBSrc, resultB, trans, cv::Size(resultHeight + 600, resultWidth), cv::INTER_NEAREST | CV_WARP_FILL_OUTLIERS, streamB);
+		gpu::warpPerspective(imageRSrc, resultR, HR, cv::Size(resultHeight + 600, resultWidth), cv::INTER_NEAREST | CV_WARP_FILL_OUTLIERS, streamR);
+		gpu::warpPerspective(imageLSrc, resultL, HL, cv::Size(resultHeight + 600, resultWidth), cv::INTER_NEAREST | CV_WARP_FILL_OUTLIERS, streamL);
+		gpu::warpPerspective(image4Src, result4, H4, cv::Size(resultHeight + 600, resultWidth), cv::INTER_NEAREST | CV_WARP_FILL_OUTLIERS, stream4);
+		gpu::warpPerspective(image5Src, result5, H5, cv::Size(resultHeight + 600, resultWidth), cv::INTER_NEAREST | CV_WARP_FILL_OUTLIERS, stream5);
+		//gpu::warpPerspective(image6Src, result6, H6, cv::Size(resultHeight + 600, resultWidth), cv::INTER_NEAREST | CV_WARP_FILL_OUTLIERS);
+		*/
+		std::cout << H4 << std::endl;
+		gpu::warpPerspective(image4Src, result4, H4, cv::Size(resultHeight + 600, resultWidth), 1, 0, cv::Scalar(), stream4);
+		stream4.waitForCompletion();
+
+#ifdef TEST_FAIL
+		cv::Mat testFrameresult4(result4.size(), result4.type());
+		cv::Mat testImage4Src(image4Src.size(), image4Src.type());
+		stream4.enqueueDownload(result4, testFrameresult4);
+		stream4.waitForCompletion();
+
+		cv::imshow("fourFrame after", testFrameresult4);
+		cv::waitKey(10);
+#endif
+
+		gpu::warpPerspective(imageRSrc, resultR, HR, cv::Size(resultHeight + 600, resultWidth), 1, 0, cv::Scalar(), streamR);
+		streamR.waitForCompletion();
+		gpu::warpPerspective(imageLSrc, resultL, HL, cv::Size(resultHeight + 600, resultWidth), 1, 0, cv::Scalar(), streamL);
+		streamL.waitForCompletion();
+
+		//gpu::resize(image4Src, result4, cv::Size(resultHeight + 600, resultWidth));
+		gpu::warpPerspective(image5Src, result5, H5, cv::Size(resultHeight + 600, resultWidth), 1, 0, cv::Scalar(), stream5);
+		stream5.waitForCompletion();
+
+
+		gpu::warpPerspective(imageBSrc, resultB, trans, cv::Size(resultHeight + 600, resultWidth), 1, 0, cv::Scalar(), streamB);
+		streamB.waitForCompletion();
+
+		/*
+		gpu::absdiff(result5, resultL, result5, stream5);
+		gpu::absdiff(result5, resultB, result5, stream5);
+		gpu::absdiff(result5, resultR, result5, stream5);
+		gpu::absdiff(result5, result4, result5, stream5);
+		*/
+		stream5.enqueueDownload(result5, outFiveFrame);
+		stream5.waitForCompletion();
+		streamL.enqueueDownload(resultL, outLeftFrame);
+		streamL.waitForCompletion();
+		streamR.enqueueDownload(resultR, outRightFrame);
+		streamR.waitForCompletion();
+		streamB.enqueueDownload(resultB, outBaseFrame);
+		streamB.waitForCompletion();
+		stream4.enqueueDownload(result4, outFourFrame);
+
+		stream4.waitForCompletion();
+
+
+
+
+
+		//cv::imshow("OUTFIVEFRAMEafter download", outFourFrame);
+#ifdef DEBUG_INFO
+		cv::imshow("OUTBafter download", outFiveFrame);
+		cv::waitKey(0);
+#endif
+		//stream6.enqueueDownload(result6, outSixFrame);
+
+
+		if (!useGrayScale) {
+
+#ifdef DEBUG_IMAGES
+			cv::imshow("1", outFiveFrame);
+			cv::imshow("2", outLeftFrame);
+			cv::imshow("3", outRightFrame);
+			cv::imshow("4", outBaseFrame);
+			cv::imshow("5", outFourFrame);
+			cv::waitKey(10);
+#endif
+			/// JH: Added RGB support using cv::Vec3b when grayScale option is disabled
+			for (int j = 0; j < result.rows; ++j)
+				for (int i = 0; i < result.cols; ++i)
+				{
+					//cout << "blending" << endl;
+					/**
+					cv::Vec3b cL(0, 0, 0);
+					cv::Vec3b cB(0, 0, 0);
+					cv::Vec3b cR(0, 0, 0);
+					cv::Vec3b cLB(0, 0, 0);
+					cv::Vec3b cBR(0, 0, 0);
+					cv::Vec3b color(0, 0, 0);
+					*/
+					float blendA = 0.8;
+					cv::Vec3b cL;
+					cv::Vec3b cB;
+					cv::Vec3b cR;
+					cv::Vec3b c4;
+					cv::Vec3b c5;
+					cv::Vec3b c6;
+					cv::Vec3b cLB;
+					cv::Vec3b cBR;
+					cv::Vec3b cR4;
+					cv::Vec3b c5L;
+					cv::Vec3b c65;
+					cv::Vec3b color;
+
+					float coeff = 0.4;
+					int blendValue;
+					bool cL_0 = false;
+					bool cB_0 = false;
+					bool cR_0 = false;
+					bool c4_0 = false;
+					bool c5_0 = false;
+					bool c6_0 = false;
+
+
+					//color = resultB.at<uchar>(j, i) + resultL.at<uchar>(j, i) + resultR.at<uchar>(j, i) + result4.at<uchar>(j, i) + result5.at<uchar>(j, i);
+
+
+					// Assign flags
+					/*
+					if (j < result.rows && i < sixLimit){
+					c6_0 = true;
+					c6 = outSixFrame.at<uchar>(j, i);
+					}
+					*/
+					if (j < result.rows && i < fifthLimit){
+						c5_0 = true;
+						c5 = outFiveFrame.at<cv::Vec3b>(j, i);
+					}
+					if (j < result.rows && i < leftLimit && i > fifthLimit){
+						cL_0 = true;
+						cL = outLeftFrame.at<cv::Vec3b>(j, i);
+					}
+					if (j < baseFrame.rows && i>baseLeftLimit && i < baseRightLimit) {
+						//cout << "cB is true" << endl;
+						cB_0 = true;
+						cB = outBaseFrame.at<cv::Vec3b>(j, i);
+					}
+					if (j < result.rows && i>rightLimit && i < fourLimit) {
+						cR_0 = true;
+						cR = outRightFrame.at<cv::Vec3b>(j, i);
+					}
+					if (j < result.rows && i> fourLimit) {
+						c4_0 = true;
+						c4 = outFourFrame.at<cv::Vec3b>(j, i);
+					}
+
+
+					// Activate color based on flags
+					if (c5_0 && cL_0 && !cB_0 && !cR_0)
+					{
+						// Use combination of five + left
+						color = ((1 - blendA)*cL + blendA*c5);
+					}
+					else if (!c5_0 && cL_0 && cB_0 && !cR_0)
+					{
+						// Use combination of base + left
+						color = ((1 - blendA)*cL + blendA*cB);
+					}
+					else if (!c5_0 && !cL_0 && cB_0 && cR_0 && !c4_0)
+					{
+						// Use combination of base + right
+						color = ((1 - blendA)*cB + blendA*cR);
+					}
+					else if (!c5_0 && !cL_0 && !cB_0 && cR_0 && c4_0)
+					{
+						// Use combination of four + right
+						color = ((1 - blendA)*cR + blendA*c4);
+					}
+					/*
+					else if (c6_0 && c5_0 && !cL_0 && !cB_0 && !cR_0 && !c4_0)
+					{
+					// Use combination of six + five
+					color = ((1 - blendA)*c5 + blendA*c6);
+					}
+					*/
+					else if (!c6_0 && !c5_0 && !cL_0 && cB_0 && !cR_0 && !c4_0)
+					{
+						// In base's frame
+						color = cB;
+					}
+					else if (!c6_0 && !c5_0 && cL_0 && !cB_0 && !cR_0)
+					{
+						// In left's frame
+						color = cL;
+					}
+
+					else if (!c6_0 && !c5_0 && !cL_0 && !cB_0 && cR_0 && !c4_0)
+					{
+						// In right frame
+						color = cR;
+					}
+					else if (!c6_0 && !c5_0 && !cL_0 && !cB_0 && !cR_0 && c4_0)
+					{
+						// In fourth frame
+						color = c4;
+					}
+					else if (!c6_0 && c5_0 && !cL_0 && !cB_0 && !cR_0 && !c4_0)
+					{
+						// In fifth frame
+						color = c5;
+					}
+					/*
+					else if (c6_0 && !c5_0 && !cL_0 && !cB_0 && !cR_0 && !c4_0)
+					{
+					// In sixth frame
+					color = c6;
+					}
+					*/
+					//result.at<cv::Vec3b>(j, i) = color;
+					result.at<cv::Vec3b>(j, i) = color;
+				}
+		}
+		else {
+			for (int j = 0; j < result.rows; ++j)
+				for (int i = 0; i < result.cols; ++i)
+				{
+					//cout << "blending" << endl;
+					/**
+					cv::Vec3b cL(0, 0, 0);
+					cv::Vec3b cB(0, 0, 0);
+					cv::Vec3b cR(0, 0, 0);
+					cv::Vec3b cLB(0, 0, 0);
+					cv::Vec3b cBR(0, 0, 0);
+					cv::Vec3b color(0, 0, 0);
+					*/
+					float blendA = 0.8;
+					uchar cL;
+					uchar cB;
+					uchar cR;
+					uchar c4;
+					uchar c5;
+					uchar c6;
+					uchar cLB;
+					uchar cBR;
+					uchar cR4;
+					uchar c5L;
+					uchar c65;
+					uchar color;
+
+					float coeff = 0.4;
+					int blendValue;
+					bool cL_0 = false;
+					bool cB_0 = false;
+					bool cR_0 = false;
+					bool c4_0 = false;
+					bool c5_0 = false;
+					bool c6_0 = false;
+
+
+					//color = resultB.at<uchar>(j, i) + resultL.at<uchar>(j, i) + resultR.at<uchar>(j, i) + result4.at<uchar>(j, i) + result5.at<uchar>(j, i);
+
+
+					// Assign flags
+					/*
+					if (j < result.rows && i < sixLimit){
+					c6_0 = true;
+					c6 = outSixFrame.at<uchar>(j, i);
+					}
+					*/
+					if (j < result.rows && i < fifthLimit){
+						c5_0 = true;
+						c5 = outFiveFrame.at<uchar>(j, i);
+					}
+					if (j < result.rows && i < leftLimit && i > fifthLimit){
+						cL_0 = true;
+						cL = outLeftFrame.at<uchar>(j, i);
+					}
+					if (j < baseFrame.rows && i>baseLeftLimit && i < baseRightLimit) {
+						//cout << "cB is true" << endl;
+						cB_0 = true;
+						cB = outBaseFrame.at<uchar>(j, i);
+					}
+					if (j < result.rows && i>rightLimit && i < fourLimit) {
+						cR_0 = true;
+						cR = outRightFrame.at<uchar>(j, i);
+					}
+					if (j < result.rows && i> fourLimit) {
+						c4_0 = true;
+						c4 = outFourFrame.at<uchar>(j, i);
+					}
+
+
+
+					// Activate color based on flags
+					if (c5_0 && cL_0 && !cB_0 && !cR_0)
+					{
+						// Use combination of five + left
+						color = ((1 - blendA)*cL + blendA*c5);
+					}
+					else if (!c5_0 && cL_0 && cB_0 && !cR_0)
+					{
+						// Use combination of base + left
+						color = ((1 - blendA)*cL + blendA*cB);
+					}
+					else if (!c5_0 && !cL_0 && cB_0 && cR_0 && !c4_0)
+					{
+						// Use combination of base + right
+						color = ((1 - blendA)*cB + blendA*cR);
+					}
+					else if (!c5_0 && !cL_0 && !cB_0 && cR_0 && c4_0)
+					{
+						// Use combination of four + right
+						color = ((1 - blendA)*cR + blendA*c4);
+					}
+					/*
+					else if (c6_0 && c5_0 && !cL_0 && !cB_0 && !cR_0 && !c4_0)
+					{
+					// Use combination of six + five
+					color = ((1 - blendA)*c5 + blendA*c6);
+					}
+					*/
+					else if (!c6_0 && !c5_0 && !cL_0 && cB_0 && !cR_0 && !c4_0)
+					{
+						// In base's frame
+						color = cB;
+					}
+					else if (!c6_0 && !c5_0 && cL_0 && !cB_0 && !cR_0)
+					{
+						// In left's frame
+						color = cL;
+					}
+
+					else if (!c6_0 && !c5_0 && !cL_0 && !cB_0 && cR_0 && !c4_0)
+					{
+						// In right frame
+						color = cR;
+					}
+					else if (!c6_0 && !c5_0 && !cL_0 && !cB_0 && !cR_0 && c4_0)
+					{
+						// In fourth frame
+						color = c4;
+					}
+					else if (!c6_0 && c5_0 && !cL_0 && !cB_0 && !cR_0 && !c4_0)
+					{
+						// In fifth frame
+						color = c5;
+					}
+					/*
+					else if (c6_0 && !c5_0 && !cL_0 && !cB_0 && !cR_0 && !c4_0)
+					{
+					// In sixth frame
+					color = c6;
+					}
+					*/
+					//result.at<cv::Vec3b>(j, i) = color;
+					result.at<uchar>(j, i) = color;
+
+				}
+		}
+
+		croppedImage = result(Rect(topLeft.x, topLeft.y, croppedWidth, croppedHeight));
+
+		//cv::imshow("left", outLeftFrame);
+		//cv::imshow("right", outRightFrame);
+		//cv::imshow("base", outBaseFrame);
+		//cv::imshow("four", outFourFrame);
+		//cv::imshow("five", outFiveFrame);
+		//cv::imshow("Result", result);
+		if (croppedImage.channels() == 3) {
+			cv::cvtColor(croppedImage, croppedImage, CV_RGB2BGR);
+		}
+
+		imshow("cropped Result", croppedImage);
+
+		//Latency Calculations
+		int _endWhileLoop = (int)getTickCount();
+		int _WhileLoopDiff = _endWhileLoop - _startWhileLoop;
+		float _secsForWhileLoop = (float)(_secsPerCycle * _WhileLoopDiff);
+		cout << "secs for Frame " << frameNo << " is " << _secsForWhileLoop << endl;
+		_totalSPF = _totalSPF + _secsForWhileLoop;
+
+		if ((frameNo % 30) == 0)
+		{
+			float _aveSPF = (float)_totalSPF / 30.0;
+			cout << "Average Seconds-Per-Frame for past 30 frames is: " << _aveSPF << endl;
+			_totalSPF = 0;
+		}
+		if (waitKey(30) == 110)
+		{
+			cout << "Saved Picture" << endl;
+			cv::imwrite("Result_2.jpg", croppedImage);
+		}
+		if (waitKey(30) == 27)
+			break;
+	}
+
+}
+
 int recordSimple() {
 
 	// Create blank image for instructions
@@ -1275,6 +2058,10 @@ int recordSimple() {
 	int frameWidth = capL.get(CV_CAP_PROP_FRAME_WIDTH)*0.25;
 	int frameHeight = capL.get(CV_CAP_PROP_FRAME_HEIGHT)*0.25;
 	cv::Mat baseFrame, leftFrame, rightFrame, fourFrame, fiveFrame;
+	std::vector<cv::Mat> FRAMES(NO_OF_CAMS);
+
+	ImageOps *IO = new ImageOps();
+
 	//uni settings 
 	double Brightness;
 	double Contrast;
@@ -1315,15 +2102,6 @@ int recordSimple() {
 	cap4.set(CV_CAP_PROP_GAIN, Gain);
 	cap5.set(CV_CAP_PROP_GAIN, Gain);
 
-	cv::Mat imageBSrc, imageBDst, imageRSrc, imageRDst, imageLSrc, image4Src, image4Dst, image5Src, image5Dst, imageLDst, image6Dst, image6Src;
-	cv::Mat outLeftFrame, outRightFrame, outBaseFrame, outFourFrame, outFiveFrame, outSixFrame;
-	outLeftFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	outRightFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	outBaseFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	outFourFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	outFiveFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	outSixFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	cv::gpu::Stream streamL, streamR, streamB, stream4, stream5, stream6;
 	outputVideoL.open(camLOutput, -1, 30, cv::Size(frameHeight, frameWidth), true);
 	outputVideoR.open(camROutput, -1, 30, cv::Size(frameHeight, frameWidth), true);
 	outputVideoB.open(camBOutput, -1, 30, cv::Size(frameHeight, frameWidth), true);
@@ -1331,41 +2109,28 @@ int recordSimple() {
 	outputVideo5.open(cam5Output, -1, 30, cv::Size(frameHeight, frameWidth), true);
 
 	while (1) {
-		capB >> baseFrame;
-		capR >> rightFrame;
-		capL >> leftFrame;
-		cap4 >> fourFrame;
-		cap5 >> fiveFrame;
+		capB >> FRAMES[0];
+		capL >> FRAMES[1];
+		capR >> FRAMES[2];
+		cap4 >> FRAMES[3];
+		cap5 >> FRAMES[4];
 
-		resize(leftFrame, leftFrame, cv::Size(frameWidth, frameHeight));
-		resize(baseFrame, baseFrame, cv::Size(frameWidth, frameHeight));
-		resize(rightFrame, rightFrame, cv::Size(frameWidth, frameHeight));
-		resize(fourFrame, fourFrame, cv::Size(frameWidth, frameHeight));
-		resize(fiveFrame, fiveFrame, cv::Size(frameWidth, frameHeight));
-		//resize(sixFrame, sixFrame, cv::Size(frameWidth, frameHeight));
-		cv::transpose(baseFrame, baseFrame);
-		cv::transpose(rightFrame, rightFrame);
-		cv::transpose(leftFrame, leftFrame);
-		cv::transpose(fourFrame, fourFrame);
-		cv::transpose(fiveFrame, fiveFrame);
-		//cv::transpose(sixFrame, sixFrame);
-		cv::flip(baseFrame, baseFrame, 1);
-		cv::flip(rightFrame, rightFrame, 1);
-		cv::flip(leftFrame, leftFrame, 1);
-		cv::flip(fourFrame, fourFrame, 1);
-		cv::flip(fiveFrame, fiveFrame, 1);
 
-		outputVideoL << leftFrame;
-		outputVideoR << rightFrame;
-		outputVideoB << baseFrame;
-		outputVideo4 << fourFrame;
-		outputVideo5 << fiveFrame;
+		IO->IO_resize(FRAMES, cv::Size(frameWidth, frameHeight));
+		IO->IO_transpose(FRAMES);
+		IO->IO_flip(FRAMES, 1);
 
-		imshow("Base", baseFrame);
-		imshow("Right", rightFrame);
-		imshow("Left", leftFrame);
-		imshow("Four", fourFrame);
-		imshow("Five", fiveFrame);
+		outputVideoB << FRAMES[0];
+		outputVideoL << FRAMES[1];
+		outputVideoR << FRAMES[2];
+		outputVideo4 << FRAMES[3];
+		outputVideo5 <<	FRAMES[4];
+
+		imshow("Base", FRAMES[0]);
+		imshow("Left", FRAMES[1]);
+		imshow("Right", FRAMES[2]);
+		imshow("Four", FRAMES[3]);
+		imshow("Five", FRAMES[4]);
 
 		if (waitKey(30) == ' ')
 			break;
