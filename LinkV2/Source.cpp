@@ -23,9 +23,9 @@ using namespace cv;
 
 const int BASE_CAM = 1; //0;
 const int LEFT_CAM = 4; // 2;
-const int RIGHT_CAM = 3; // 1;
-const int FOUR_CAM = 0; // 4;
-const int FIFTH_CAM = 2; // 3;
+const int RIGHT_CAM = 2; // 3; // 1;
+const int FOUR_CAM = 0; // 0; // 4;
+const int FIFTH_CAM = 3; // 2; // 3;
 const int BACK_CAM = 5;
 const int NO_OF_CAMS = 5;
 

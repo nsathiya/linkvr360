@@ -29,7 +29,13 @@ public:
 		std::vector<cv::Mat> distortionCoeffs);
 	void IO_perspectiveTransform(std::vector<cv::Mat> &imagesArray, std::vector<cv::Mat> externalCoeffs);
 	void IO_rectilinearProject(std::vector<cv::Mat> &imagesArray, int INV_FLAG, std::vector<float> FOCAL);
-	void IO_warpPerspective(std::vector<cv::Mat> &imagesArray, std::vector<cv::Mat> externalCoeffs, cv::Size dSize);
+	void IO_warpPerspective(std::vector<cv::Mat> &imagesArray, std::vector<cv::Mat> &resultsArray, std::vector<cv::Mat> externalCoeffs, cv::Size dSize);
+
+private: 
+	cv::Point2f convert_pt(cv::Point2f point, int w, int h, int INV_FLAG, float F);
+	cv::Mat rectlinearProject(cv::Mat ImgToCalibrate, bool INV_FLAG, float F);
+	template<typename T>
+	void interpolateBilinear(cv::Mat Pic, cv::Point2f current_pos, cv::Point2i topLeftPoint, T &value);
 	
 };
 
