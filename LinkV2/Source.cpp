@@ -22,8 +22,8 @@ using namespace std;
 using namespace cv;
 
 const int BASE_CAM = 1; //0;
-const int LEFT_CAM = 4; // 2;
-const int RIGHT_CAM = 2; // 3; // 1;
+const int LEFT_CAM = 2; // 4; // 2;
+const int RIGHT_CAM = 4; // 2; // 3; // 1;
 const int FOUR_CAM = 0; // 0; // 4;
 const int FIFTH_CAM = 3; // 2; // 3;
 const int BACK_CAM = 5;
@@ -142,9 +142,9 @@ int main() {
 void setup()
 {
 
-	CAM_F_MAP[LEFT_CAM] = 171.575;
+	CAM_F_MAP[LEFT_CAM] = 171.9173;
 	CAM_F_MAP[BASE_CAM] = 175.0214;
-	CAM_F_MAP[RIGHT_CAM] = 171.9173;
+	CAM_F_MAP[RIGHT_CAM] = 171.575;
 	CAM_F_MAP[FOUR_CAM] = 176.9511;
 	CAM_F_MAP[FIFTH_CAM] = 175.2695;
 	//CAM_F_MAP[BACK_CAM] = 175.2695;
@@ -3291,22 +3291,22 @@ int calibrateCamerasExternal(int baseCam, int sideCam)
 	if (sideCam == RIGHT_CAM)
 	{
 		cout << "Saving to right..." << endl;
-		file.open("H-right.txt", cv::FileStorage::WRITE);
+		file.open(externalCalibrationPath + "/H-right.txt", cv::FileStorage::WRITE);
 	}
 	else if (sideCam == LEFT_CAM)
 	{
 		cout << "Saving to left..." << endl;
-		file.open("H-left.txt", cv::FileStorage::WRITE);
+		file.open(externalCalibrationPath + "/H-left.txt", cv::FileStorage::WRITE);
 	}
 	else if (sideCam == FOUR_CAM)
 	{
 		cout << "Saving to fourth..." << endl;
-		file.open("H-four.txt", cv::FileStorage::WRITE);
+		file.open(externalCalibrationPath + "/H-four.txt", cv::FileStorage::WRITE);
 	}
 	else if (sideCam == FIFTH_CAM)
 	{
 		cout << "Saving to fifth..." << endl;
-		file.open("H-five.txt", cv::FileStorage::WRITE);
+		file.open(externalCalibrationPath + "/H-five.txt", cv::FileStorage::WRITE);
 	}
 
 	file << "H Matrix" << H;
