@@ -21,9 +21,9 @@
 using namespace std;
 using namespace cv;
 
-const int BASE_CAM = 4; // 1; //0;
+const int BASE_CAM = 1; // 4; // 1; //0;
 const int LEFT_CAM = 3; // 2; // 4; // 2;
-const int RIGHT_CAM = 1; // 4; // 2; // 3; // 1;
+const int RIGHT_CAM = 4; // 1; // 4; // 2; // 3; // 1;
 const int FOUR_CAM = 0; // 0; // 4;
 const int FIFTH_CAM = 2; // 3; // 2; // 3;
 const int BACK_CAM = 5;
@@ -341,63 +341,22 @@ int showFrames()
 	//cv::VideoWriter outputVideo;
 	cv::Mat leftFrame, rightFrame, fourFrame, fifthFrame, sixFrame;
 
-	/*
-	int NO_OF_ATTEMPTS = 20;
-	cv::VideoCapture capTest;
-	for (int i = 0; i < 30; i++)
-	{
-	Mat baseFrame;
-	capTest.open(i);
-	capTest.read(baseFrame);
-
-	if (baseFrame.empty())
-	{
-	cout << "USB port " << i << " is empty" << endl;
-	continue;
-	}
-
-	else
-	{
-	cout << "Camera is on USB port " << i << "!" << endl;
-	waitKey(0);
-	imshow("example", baseFrame);
-	}
-	}
-
-	waitKey(0);
-	*/
-
 	while (1)
 	{
-		capB >> baseFrame;
-		capR >> rightFrame;
-		capL >> leftFrame;
-		cap4 >> fourFrame;
-		cap5 >> fifthFrame;
-		cap6 >> sixFrame;
-		/*
-		if (!capB.isOpened())
-		{
-		cout << "Camera is not opened" << endl;
-		return 0;
-		}
+		capB >> FRAMES[0];
+		capL >> FRAMES[1];
+		capR >> FRAMES[2];
+		cap4 >> FRAMES[3];
+		cap5 >> FRAMES[4];
 
-		//cout << "breakpoint 2" << endl;
-		*/
 		if (waitKey(100) == 110)
 			break;
-		/*
-		if (baseFrame.empty())
-		{
-		cout << "sixFrame is empty" << endl;
-		return 0;
-		}
-		*/
-		imshow("base Frame", baseFrame);
-		imshow("right Frame", rightFrame);
-		imshow("left Frame", leftFrame);
-		imshow("four Frame", fourFrame);
-		imshow("five Frame", fifthFrame);
+
+		imshow("base Frame",  FRAMES[0]);
+		imshow("left Frame",  FRAMES[1]);
+		imshow("right Frame", FRAMES[2]);
+		imshow("four Frame",  FRAMES[3]);
+		imshow("five Frame",  FRAMES[4]);
 		//imshow("sixth Frame", sixFrame);
 	}
 
@@ -1436,7 +1395,7 @@ int testingFunction() {
 	//sixLimit = scene_cornersSix[1].x;
 	leftLimit = scene_cornersLeft[1].x;
 	baseLeftLimit = x_offset;
-	baseRightLimit = x_offset + baseFrame.cols;
+	baseRightLimit = x_offset + FRAMES[0].cols;
 	rightLimit = scene_cornersRight[0].x;
 	fourLimit = scene_cornersFour[0].x;
 	Mat croppedImage;
@@ -1522,14 +1481,6 @@ int testingFunction() {
 		cap4 >> FRAMES[3];
 		cap5 >> FRAMES[4];
 
-#ifdef ForceColorPixels	
-		cv::circle(baseFrame, cv::Point(frameWidth / 2, frameHeight / 2), 5, cv::Scalar(0, 255, 0), 2);
-		cv::circle(rightFrame, cv::Point(frameWidth / 2, frameHeight / 2), 5, cv::Scalar(0, 255, 0), 2);
-		cv::circle(leftFrame, cv::Point(frameWidth / 2, frameHeight / 2), 5, cv::Scalar(0, 255, 0), 2);
-		cv::circle(fourFrame, cv::Point(frameWidth / 2, frameHeight / 2), 5, cv::Scalar(0, 255, 0), 2);
-		cv::circle(fiveFrame, cv::Point(frameWidth / 2, frameHeight / 2), 5, cv::Scalar(0, 255, 0), 2);
-#endif
-
 		//imshow("base Frame", baseFrame);
 		if (useGrayScale) {	
 			IO->IO_cvtColor(FRAMES, CV_RGB2GRAY);
@@ -1547,7 +1498,6 @@ int testingFunction() {
 			fourFrame = rrr.clone();
 			cvtColor(fiveFrame, rrr, CV_RGB2BGR);
 			fiveFrame = rrr.clone();
-
 		}
 
 		IO->IO_resize(FRAMES, cv::Size(frameWidth, frameHeight));
@@ -1555,125 +1505,7 @@ int testingFunction() {
 		IO->IO_flip(FRAMES, 1);
 		IO->IO_undistort(FRAMES, INTRINSICCOEFFS, DISTORTIONCOEFFS);
 		IO->IO_rectilinearProject(FRAMES, 0, FOCAL);
-
-#ifdef DEBUG_IMAGES
-		cv::imshow("0", baseFrame);
-		cv::imshow("1", leftFrame);
-		cv::imshow("2", rightFrame);
-		cv::imshow("3", fourFrame);
-		cv::imshow("4", fiveFrame);
-		cv::waitKey(0);
-#endif
-
-
-
-
-#ifdef DEBUG_INFO
-		cv::imshow("OUTFIVEFRAMEafter upload", fourFrame);
-#endif
-		//sixFrame = rectLinearSixFrame;
-
-		//Upload back to GPU
-
-		/*streamB.enqueueUpload(baseFrame, imageBSrc);
-		streamB.waitForCompletion();
-#ifdef DEBUG_IMAGES
-		cv::imshow("fourFrame before", fourFrame);
-		cv::waitKey(10);
-#endif
-		stream4.enqueueUpload(fourFrame, image4Src);
-		stream4.waitForCompletion();
-
-
-
-		stream5.enqueueUpload(fiveFrame, image5Src);
-		stream5.waitForCompletion();
-
-
-
-		streamL.enqueueUpload(leftFrame, imageLSrc);
-		streamL.waitForCompletion();
-		streamR.enqueueUpload(rightFrame, imageRSrc);
-		streamR.waitForCompletion();*/
-
-#ifdef DEBUG_IMAGES
-		/*stream5.enqueueDownload(result5, outFiveFrame);
-		stream5.waitForCompletion();
-		streamL.enqueueDownload(resultL, outLeftFrame);
-		streamL.waitForCompletion();
-		streamR.enqueueDownload(resultR, outRightFrame);
-		streamR.waitForCompletion();
-		streamB.enqueueDownload(resultB, outBaseFrame);
-		streamB.waitForCompletion();
-		stream4.enqueueDownload(result4, outFourFrame);
-		stream4.waitForCompletion();*/
-#endif
-
-		//stream6.enqueueUpload(sixFrame, image6Src);
-
-		/*
-		//Warp Perspective
-		gpu::warpPerspective(imageBSrc, resultB, trans, cv::Size(resultHeight + 600, resultWidth), cv::INTER_NEAREST | CV_WARP_FILL_OUTLIERS, streamB);
-		gpu::warpPerspective(imageRSrc, resultR, HR, cv::Size(resultHeight + 600, resultWidth), cv::INTER_NEAREST | CV_WARP_FILL_OUTLIERS, streamR);
-		gpu::warpPerspective(imageLSrc, resultL, HL, cv::Size(resultHeight + 600, resultWidth), cv::INTER_NEAREST | CV_WARP_FILL_OUTLIERS, streamL);
-		gpu::warpPerspective(image4Src, result4, H4, cv::Size(resultHeight + 600, resultWidth), cv::INTER_NEAREST | CV_WARP_FILL_OUTLIERS, stream4);
-		gpu::warpPerspective(image5Src, result5, H5, cv::Size(resultHeight + 600, resultWidth), cv::INTER_NEAREST | CV_WARP_FILL_OUTLIERS, stream5);
-		//gpu::warpPerspective(image6Src, result6, H6, cv::Size(resultHeight + 600, resultWidth), cv::INTER_NEAREST | CV_WARP_FILL_OUTLIERS);
-		*/
-		/*std::cout << H4 << std::endl;
-		gpu::warpPerspective(image4Src, result4, H4, cv::Size(resultHeight + 600, resultWidth), 1, 0, cv::Scalar(), stream4);
-		stream4.waitForCompletion();
-*/
-#ifdef TEST_FAIL
-		cv::Mat testFrameresult4(result4.size(), result4.type());
-		cv::Mat testImage4Src(image4Src.size(), image4Src.type());
-		stream4.enqueueDownload(result4, testFrameresult4);
-		stream4.waitForCompletion();
-
-		cv::imshow("fourFrame after", testFrameresult4);
-		cv::waitKey(10);
-#endif
-
-		//gpu::warpPerspective(imageRSrc, resultR, HR, cv::Size(resultHeight + 600, resultWidth), 1, 0, cv::Scalar(), streamR);
-		//streamR.waitForCompletion();
-		//gpu::warpPerspective(imageLSrc, resultL, HL, cv::Size(resultHeight + 600, resultWidth), 1, 0, cv::Scalar(), streamL);
-		//streamL.waitForCompletion();
-
-		////gpu::resize(image4Src, result4, cv::Size(resultHeight + 600, resultWidth));
-		//gpu::warpPerspective(image5Src, result5, H5, cv::Size(resultHeight + 600, resultWidth), 1, 0, cv::Scalar(), stream5);
-		//stream5.waitForCompletion();
-
-
-		//gpu::warpPerspective(imageBSrc, resultB, trans, cv::Size(resultHeight + 600, resultWidth), 1, 0, cv::Scalar(), streamB);
-		//streamB.waitForCompletion();
-
-		/*
-		gpu::absdiff(result5, resultL, result5, stream5);
-		gpu::absdiff(result5, resultB, result5, stream5);
-		gpu::absdiff(result5, resultR, result5, stream5);
-		gpu::absdiff(result5, result4, result5, stream5);
-		*/
-		/*stream5.enqueueDownload(result5, outFiveFrame);
-		stream5.waitForCompletion();
-		streamL.enqueueDownload(resultL, outLeftFrame);
-		streamL.waitForCompletion();
-		streamR.enqueueDownload(resultR, outRightFrame);
-		streamR.waitForCompletion();
-		streamB.enqueueDownload(resultB, outBaseFrame);
-		streamB.waitForCompletion();
-		stream4.enqueueDownload(result4, outFourFrame);
-
-		stream4.waitForCompletion();
-*/
 		IO->IO_warpPerspective(FRAMES, RESULTS, EXTRINSICCOEFFS, cv::Size(resultHeight + 600, resultWidth));
-
-		//cv::imshow("OUTFIVEFRAMEafter download", outFourFrame);
-#ifdef DEBUG_INFO
-		cv::imshow("OUTBafter download", outFiveFrame);
-		cv::waitKey(0);
-#endif
-		//stream6.enqueueDownload(result6, outSixFrame);
-
 
 		if (!useGrayScale) {
 
@@ -1740,8 +1572,8 @@ int testingFunction() {
 						cL_0 = true;
 						cL = outLeftFrame.at<cv::Vec3b>(j, i);
 					}
-					if (j < baseFrame.rows && i>baseLeftLimit && i < baseRightLimit) {
-						//cout << "cB is true" << endl;
+					if (j < result.rows && i>baseLeftLimit && i < baseRightLimit) {
+						cout << "cB is true" << endl;
 						cB_0 = true;
 						cB = outBaseFrame.at<cv::Vec3b>(j, i);
 					}
@@ -1875,7 +1707,7 @@ int testingFunction() {
 						cL_0 = true;
 						cL = RESULTS[1].at<uchar>(j, i);
 					}
-					if (j < RESULTS[0].rows && i>baseLeftLimit && i < baseRightLimit) {
+					if (j < result.rows && i > baseLeftLimit && i < baseRightLimit) {
 						//cout << "cB is true" << endl;
 						cB_0 = true;
 						cB = RESULTS[0].at<uchar>(j, i);
