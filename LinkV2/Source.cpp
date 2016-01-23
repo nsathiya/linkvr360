@@ -21,11 +21,11 @@
 using namespace std;
 using namespace cv;
 
-const int BASE_CAM = 1; //0;
-const int LEFT_CAM = 2; // 4; // 2;
-const int RIGHT_CAM = 4; // 2; // 3; // 1;
+const int BASE_CAM = 4; // 1; //0;
+const int LEFT_CAM = 3; // 2; // 4; // 2;
+const int RIGHT_CAM = 1; // 4; // 2; // 3; // 1;
 const int FOUR_CAM = 0; // 0; // 4;
-const int FIFTH_CAM = 3; // 2; // 3;
+const int FIFTH_CAM = 2; // 3; // 2; // 3;
 const int BACK_CAM = 5;
 const int NO_OF_CAMS = 5;
 
@@ -75,6 +75,12 @@ cv::Point2f convert_pt(cv::Point2f point, int w, int h, int INV_FLAG, float F);
 cv::Mat rectlinearProject(Mat ImgToCalibrate, bool INV_FLAG, float F);
 int calibrateCamerasInternal(int cam);
 int calibrateCamerasExternal(int baseCam, int sideCam);
+std::vector<cv::Mat> FRAMES(NO_OF_CAMS);
+std::vector<cv::Mat> INTRINSICCOEFFS(NO_OF_CAMS);
+std::vector<cv::Mat> EXTRINSICCOEFFS(NO_OF_CAMS);
+std::vector<cv::Mat> DISTORTIONCOEFFS(NO_OF_CAMS);
+std::vector<cv::Mat> RESULTS(NO_OF_CAMS);
+std::vector<float> FOCAL(NO_OF_CAMS);
 
 int main() {
 
@@ -119,7 +125,7 @@ int main() {
 		}
 		else if (optionSelected == 'c')
 		{
-			if (calibrateCamerasExternal(BASE_CAM, LEFT_CAM) == 1)
+			if (calibrateCamerasExternal(RIGHT_CAM, FOUR_CAM) == 1)
 				return 0;
 		}
 		else if (optionSelected == 'i')
@@ -142,11 +148,11 @@ int main() {
 void setup()
 {
 
-	CAM_F_MAP[LEFT_CAM] = 171.9173;
-	CAM_F_MAP[BASE_CAM] = 175.0214;
-	CAM_F_MAP[RIGHT_CAM] = 171.575;
-	CAM_F_MAP[FOUR_CAM] = 176.9511;
-	CAM_F_MAP[FIFTH_CAM] = 175.2695;
+	FOCAL[0] = CAM_F_MAP[BASE_CAM] = 175.0214;
+	FOCAL[1] = CAM_F_MAP[LEFT_CAM] = 171.9173;
+	FOCAL[2] = CAM_F_MAP[RIGHT_CAM] = 171.575;
+	FOCAL[3] = CAM_F_MAP[FOUR_CAM] = 176.9511;
+	FOCAL[4] = CAM_F_MAP[FIFTH_CAM] = 175.2695;
 	//CAM_F_MAP[BACK_CAM] = 175.2695;
 
 	IntrinsicBase_File = internalCalibrationPath + "/intrinsic-base.txt";
@@ -210,6 +216,24 @@ void setup()
 	H4.convertTo(H4, CV_32FC1);
 	H5.convertTo(H5, CV_32FC1);
 	//H6.convertTo(H6, CV_32FC1);
+
+	INTRINSICCOEFFS[0] = baseIntrinsic;
+	INTRINSICCOEFFS[1] = leftIntrinsic;
+	INTRINSICCOEFFS[2] = rightIntrinsic;
+	INTRINSICCOEFFS[3] = fourIntrinsic;
+	INTRINSICCOEFFS[4] = fiveIntrinsic;
+
+	DISTORTIONCOEFFS[0] = baseDistCoeffs;
+	DISTORTIONCOEFFS[1] = leftDistCoeffs;
+	DISTORTIONCOEFFS[2] = rightDistCoeffs;
+	DISTORTIONCOEFFS[3] = fourDistCoeffs;
+	DISTORTIONCOEFFS[4] = fiveDistCoeffs;
+	
+	EXTRINSICCOEFFS[0] = NULL;
+	EXTRINSICCOEFFS[1] = HL;
+	EXTRINSICCOEFFS[2] = HR;
+	EXTRINSICCOEFFS[3] = H4;
+	EXTRINSICCOEFFS[4] = H5;
 
 }
 
@@ -1260,7 +1284,9 @@ int testingFunction() {
 	cv::Mat result, leftFrame, baseFrame, rightFrame, fourFrame, fiveFrame, sixFrame;
 	cv::Mat undistortedLeftFrame, undistortedBaseFrame, undistortedRightFrame, undistortedFourFrame, undistortedFiveFrame, undistortedSixFrame;
 
-	gpu::GpuMat resultL, resultB, resultR, resultMask, result4, result5, result6;
+	//gpu::GpuMat resultL, resultB, resultR, resultMask, result4, result5, result6;
+	cv::Mat resultL, resultB, resultR, resultMask, result4, result5, result6;
+
 	std::vector<cv::Point2f> scene_cornersLeft, scene_cornersRight, scene_cornersBase, scene_cornersFour, scene_cornersFive, scene_cornersSix, scene_corners;
 	capL.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
 	capL.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
@@ -1320,13 +1346,22 @@ int testingFunction() {
 	int resultWidth = frameHeight * 2;
 	int resultHeight = frameWidth + 100;
 	bool record = false;
-	resultL = gpu::GpuMat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
+	/*resultL = gpu::GpuMat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
 	resultR = gpu::GpuMat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
 	resultB = gpu::GpuMat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
 	result4 = gpu::GpuMat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
 	result5 = gpu::GpuMat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	result6 = gpu::GpuMat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
+	result6 = gpu::GpuMat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);*/
+	RESULTS[0] = resultB = cv::Mat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
+	RESULTS[1] = resultL = cv::Mat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
+	RESULTS[2] = resultR = cv::Mat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
+	RESULTS[3] = result4 = cv::Mat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
+	RESULTS[4] = result5 = cv::Mat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
+	
 	result = Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
+
+	ImageOps *IO = new ImageOps();
+
 
 	// Move Scene to the right by 100
 	int x_offset = 500;
@@ -1334,7 +1369,7 @@ int testingFunction() {
 	float z_offset = 100.0;
 	float transdata[] = { 1.0, 0.0, x_offset, 0.0, 1.0, y_offset, 0.0, 0.0, 1.0 };
 	cv::Mat trans(3, 3, CV_32FC1, transdata);
-	cout << "HR: " << HR << endl;
+	EXTRINSICCOEFFS[0] = trans;
 
 	Mat HR_m = HR.clone();
 	Mat HL_m = HL.clone();
@@ -1346,88 +1381,57 @@ int testingFunction() {
 
 	cout << "finished getting matrix" << endl;
 
-	capL.read(leftFrame);
-	capR.read(rightFrame);
-	capB.read(baseFrame);
-	cap4.read(fourFrame);
-	cap5.read(fiveFrame);
-	//cap6.read(sixFrame);
+	capB >> FRAMES[0];
+	capL >> FRAMES[1];
+	capR >> FRAMES[2];
+	cap4 >> FRAMES[3];
+	cap5 >> FRAMES[4];
 
 
-	if (fiveFrame.cols == 0) {
+	if (FRAMES[0].cols == 0) {
 		cout << "Error reading file " << endl;
 		return -1;
 	}
-	resize(leftFrame, leftFrame, cv::Size(frameWidth, frameHeight));
-	resize(baseFrame, baseFrame, cv::Size(frameWidth, frameHeight));
-	resize(rightFrame, rightFrame, cv::Size(frameWidth, frameHeight));
-	resize(fourFrame, fourFrame, cv::Size(frameWidth, frameHeight));
-	resize(fiveFrame, fiveFrame, cv::Size(frameWidth, frameHeight));
-	//resize(sixFrame, sixFrame, cv::Size(frameWidth, frameHeight));
-
-	cv::transpose(baseFrame, baseFrame);
-	cv::transpose(rightFrame, rightFrame);
-	cv::transpose(leftFrame, leftFrame);
-	cv::transpose(fourFrame, fourFrame);
-	cv::transpose(fiveFrame, fiveFrame);
-	//cv::transpose(sixFrame, sixFrame);
-	cv::flip(baseFrame, baseFrame, 1);
-	cv::flip(rightFrame, rightFrame, 1);
-	cv::flip(leftFrame, leftFrame, 1);
-	cv::flip(fourFrame, fourFrame, 1);
-	cv::flip(fiveFrame, fiveFrame, 1);
-	//cv::flip(sixFrame, sixFrame, 1);
-	undistort(leftFrame, undistortedLeftFrame, leftIntrinsic, leftDistCoeffs);
-	undistort(baseFrame, undistortedBaseFrame, baseIntrinsic, baseDistCoeffs);
-	undistort(rightFrame, undistortedRightFrame, rightIntrinsic, rightDistCoeffs);
-	undistort(fourFrame, undistortedFourFrame, fourIntrinsic, fourDistCoeffs);
-	undistort(fiveFrame, undistortedFiveFrame, fiveIntrinsic, fiveDistCoeffs);
-	//undistort(sixFrame, undistortedSixFrame, sixIntrinsic, sixDistCoeffs);
-	leftFrame = undistortedLeftFrame;
-	baseFrame = undistortedBaseFrame;
-	rightFrame = undistortedRightFrame;
-	fourFrame = undistortedFourFrame;
-	fiveFrame = undistortedFiveFrame;
-	//sixFrame = undistortedSixFrame;
-
-	// Use the Homography Matrix to warp the images
+	
+	IO->IO_resize(FRAMES, cv::Size(frameWidth, frameHeight));
+	IO->IO_transpose(FRAMES);
+	IO->IO_flip(FRAMES, 1);
+	IO->IO_undistort(FRAMES, INTRINSICCOEFFS, DISTORTIONCOEFFS);
+	
+	//MOVE TO PREPROCESSING
 	scene_corners.clear();
 	scene_cornersLeft.push_back(Point2f(0.0, 0.0));
-	scene_cornersLeft.push_back(Point2f(leftFrame.cols, 0.0));
-	scene_cornersLeft.push_back(Point2f(0.0, leftFrame.rows));
-	scene_cornersLeft.push_back(Point2f(leftFrame.cols, leftFrame.rows));
+	scene_cornersLeft.push_back(Point2f(FRAMES[1].cols, 0.0));
+	scene_cornersLeft.push_back(Point2f(0.0, FRAMES[1].rows));
+	scene_cornersLeft.push_back(Point2f(FRAMES[1].cols, FRAMES[1].rows));
 	scene_cornersRight.push_back(Point2f(0.0, 0.0));
-	scene_cornersRight.push_back(Point2f(rightFrame.cols, 0.0));
-	scene_cornersRight.push_back(Point2f(0.0, rightFrame.rows));
-	scene_cornersRight.push_back(Point2f(rightFrame.cols, leftFrame.rows));
+	scene_cornersRight.push_back(Point2f(FRAMES[2].cols, 0.0));
+	scene_cornersRight.push_back(Point2f(0.0, FRAMES[2].rows));
+	scene_cornersRight.push_back(Point2f(FRAMES[2].cols, FRAMES[2].rows));
 	scene_cornersBase.push_back(Point2f(0.0, 0.0));
-	scene_cornersBase.push_back(Point2f(baseFrame.cols, 0.0));
-	scene_cornersBase.push_back(Point2f(0.0, baseFrame.rows));
-	scene_cornersBase.push_back(Point2f(baseFrame.cols, baseFrame.rows));
+	scene_cornersBase.push_back(Point2f(FRAMES[0].cols, 0.0));
+	scene_cornersBase.push_back(Point2f(0.0, FRAMES[0].rows));
+	scene_cornersBase.push_back(Point2f(FRAMES[0].cols, FRAMES[0].rows));
 	scene_cornersFour.push_back(Point2f(0.0, 0.0));
-	scene_cornersFour.push_back(Point2f(fourFrame.cols, 0.0));
-	scene_cornersFour.push_back(Point2f(0.0, fourFrame.rows));
-	scene_cornersFour.push_back(Point2f(fourFrame.cols, fourFrame.rows));
+	scene_cornersFour.push_back(Point2f(FRAMES[3].cols, 0.0));
+	scene_cornersFour.push_back(Point2f(0.0, FRAMES[3].rows));
+	scene_cornersFour.push_back(Point2f(FRAMES[3].cols, FRAMES[3].rows));
 	scene_cornersFive.push_back(Point2f(0.0, 0.0));
-	scene_cornersFive.push_back(Point2f(fiveFrame.cols, 0.0));
-	scene_cornersFive.push_back(Point2f(0.0, fiveFrame.rows));
-	scene_cornersFive.push_back(Point2f(fiveFrame.cols, fiveFrame.rows));
-	//scene_cornersSix.push_back(Point2f(0.0, 0.0));
-	//scene_cornersSix.push_back(Point2f(sixFrame.cols, 0.0));
-	//scene_cornersSix.push_back(Point2f(0.0, sixFrame.rows));
-	//scene_cornersSix.push_back(Point2f(sixFrame.cols, sixFrame.rows));
-
+	scene_cornersFive.push_back(Point2f(FRAMES[4].cols, 0.0));
+	scene_cornersFive.push_back(Point2f(0.0, FRAMES[4].rows));
+	scene_cornersFive.push_back(Point2f(FRAMES[4].cols, FRAMES[4].rows));
+	
+	//MOVE TO PREPROCESSING
 	perspectiveTransform(scene_cornersBase, scene_cornersBase, trans);
 	perspectiveTransform(scene_cornersLeft, scene_cornersLeft, HL);
 	perspectiveTransform(scene_cornersRight, scene_cornersRight, HR);
 	perspectiveTransform(scene_cornersFour, scene_cornersFour, H4);
 	perspectiveTransform(scene_cornersFive, scene_cornersFive, H5);
-	//perspectiveTransform(scene_cornersSix, scene_cornersSix, H6);
-
 
 	//Store useful information for Image limits
 	int leftLimit, baseLeftLimit, baseRightLimit, rightLimit, fourLimit, fifthLimit, sixLimit;
 
+	//MOVE TO PREPROCESSING
 	fifthLimit = scene_cornersFive[1].x;
 	//sixLimit = scene_cornersSix[1].x;
 	leftLimit = scene_cornersLeft[1].x;
@@ -1438,6 +1442,7 @@ int testingFunction() {
 	Mat croppedImage;
 
 	//for cropping final result PLEASE REDO
+	//MOVE TO PREPROCESSING
 	cv::Point topLeft, topRight, bottomLeft, bottomRight;
 	int bottomLowerHeight, rightSmallerWidth, croppedWidth, croppedHeight;
 	topLeft.y = scene_cornersFive[0].y;
@@ -1449,6 +1454,7 @@ int testingFunction() {
 	bottomRight.y = scene_cornersFour[3].y;
 	bottomRight.x = scene_cornersFour[3].x;
 
+	//MOVE TO PREPROCESSING
 	if (topLeft.y < 0)
 		topLeft.y = 0;
 	if (topLeft.x < 0)
@@ -1466,6 +1472,7 @@ int testingFunction() {
 	if (bottomLeft.x < 0)
 		bottomLeft.x = 0;
 
+	//MOVE TO PREPROCESSING
 	(bottomLeft.y < bottomRight.y) ? bottomLowerHeight = bottomLeft.y : bottomLowerHeight = bottomRight.y;
 	(topRight.x < bottomRight.x) ? rightSmallerWidth = topRight.x : rightSmallerWidth = bottomRight.x;
 	(topLeft.x < bottomLeft.x) ? topLeft.x = bottomLeft.x : topLeft.x = topLeft.x;
@@ -1508,12 +1515,12 @@ int testingFunction() {
 	{
 		frameNo++;
 		int _startWhileLoop = (int)getTickCount();
-		capL.read(leftFrame);
-		capR.read(rightFrame);
-		capB.read(baseFrame);
-		cap4.read(fourFrame);
-		cap5.read(fiveFrame);
-		//cap6.read(sixFrame);
+		
+		capB >> FRAMES[0];
+		capL >> FRAMES[1];
+		capR >> FRAMES[2];
+		cap4 >> FRAMES[3];
+		cap5 >> FRAMES[4];
 
 #ifdef ForceColorPixels	
 		cv::circle(baseFrame, cv::Point(frameWidth / 2, frameHeight / 2), 5, cv::Scalar(0, 255, 0), 2);
@@ -1524,14 +1531,8 @@ int testingFunction() {
 #endif
 
 		//imshow("base Frame", baseFrame);
-		if (useGrayScale) {
-			cvtColor(rightFrame, rightFrame, CV_RGB2GRAY);
-			cvtColor(baseFrame, baseFrame, CV_RGB2GRAY);
-			//imshow("test Frame", baseFrame);
-			cvtColor(leftFrame, leftFrame, CV_RGB2GRAY);
-			cvtColor(fourFrame, fourFrame, CV_RGB2GRAY);
-			cvtColor(fiveFrame, fiveFrame, CV_RGB2GRAY);
-			//cvtColor(sixFrame, sixFrame, CV_RGB2GRAY);
+		if (useGrayScale) {	
+			IO->IO_cvtColor(FRAMES, CV_RGB2GRAY);
 		}
 		else {
 			cv::Mat rrr;
@@ -1549,43 +1550,12 @@ int testingFunction() {
 
 		}
 
-		resize(leftFrame, leftFrame, cv::Size(frameWidth, frameHeight));
-		resize(baseFrame, baseFrame, cv::Size(frameWidth, frameHeight));
-		resize(rightFrame, rightFrame, cv::Size(frameWidth, frameHeight));
-		resize(fourFrame, fourFrame, cv::Size(frameWidth, frameHeight));
-		resize(fiveFrame, fiveFrame, cv::Size(frameWidth, frameHeight));
-		//resize(sixFrame, sixFrame, cv::Size(frameWidth, frameHeight));
-		cv::transpose(baseFrame, baseFrame);
-		cv::transpose(rightFrame, rightFrame);
-		cv::transpose(leftFrame, leftFrame);
-		cv::transpose(fourFrame, fourFrame);
-		cv::transpose(fiveFrame, fiveFrame);
-		//cv::transpose(sixFrame, sixFrame);
-		cv::flip(baseFrame, baseFrame, 1);
-		cv::flip(rightFrame, rightFrame, 1);
-		cv::flip(leftFrame, leftFrame, 1);
-		cv::flip(fourFrame, fourFrame, 1);
-		cv::flip(fiveFrame, fiveFrame, 1);
-		//cv::flip(sixFrame, sixFrame, 1);
-		undistort(leftFrame, undistortedLeftFrame, leftIntrinsic, leftDistCoeffs);
-		undistort(baseFrame, undistortedBaseFrame, baseIntrinsic, baseDistCoeffs);
-		undistort(rightFrame, undistortedRightFrame, rightIntrinsic, rightDistCoeffs);
-		undistort(fourFrame, undistortedFourFrame, fourIntrinsic, fourDistCoeffs);
-		undistort(fiveFrame, undistortedFiveFrame, fiveIntrinsic, fiveDistCoeffs);
-		//undistort(sixFrame, undistortedSixFrame, sixIntrinsic, sixDistCoeffs);
+		IO->IO_resize(FRAMES, cv::Size(frameWidth, frameHeight));
+		IO->IO_transpose(FRAMES);
+		IO->IO_flip(FRAMES, 1);
+		IO->IO_undistort(FRAMES, INTRINSICCOEFFS, DISTORTIONCOEFFS);
+		IO->IO_rectilinearProject(FRAMES, 0, FOCAL);
 
-		cv::Mat rectLinearBaseFrame = rectlinearProject(undistortedBaseFrame, 0, CAM_F_MAP[BASE_CAM]);
-		cv::Mat rectLinearRightFrame = rectlinearProject(undistortedRightFrame, 0, CAM_F_MAP[RIGHT_CAM]);
-		cv::Mat rectLinearLeftFrame = rectlinearProject(undistortedLeftFrame, 0, CAM_F_MAP[LEFT_CAM]);
-		cv::Mat rectLinearFourFrame = rectlinearProject(undistortedFourFrame, 0, CAM_F_MAP[FOUR_CAM]);
-		cv::Mat rectLinearFiveFrame = rectlinearProject(undistortedFiveFrame, 0, CAM_F_MAP[FIFTH_CAM]);
-		//cv::Mat rectLinearSixFrame = rectlinearProject(undistortedSixFrame, 0, CAM_F_MAP[BACK_CAM]);
-
-		baseFrame = rectLinearBaseFrame;
-		leftFrame = rectLinearLeftFrame;
-		rightFrame = rectLinearRightFrame;
-		fourFrame = rectLinearFourFrame;
-		fiveFrame = rectLinearFiveFrame;
 #ifdef DEBUG_IMAGES
 		cv::imshow("0", baseFrame);
 		cv::imshow("1", leftFrame);
@@ -1605,7 +1575,7 @@ int testingFunction() {
 
 		//Upload back to GPU
 
-		streamB.enqueueUpload(baseFrame, imageBSrc);
+		/*streamB.enqueueUpload(baseFrame, imageBSrc);
 		streamB.waitForCompletion();
 #ifdef DEBUG_IMAGES
 		cv::imshow("fourFrame before", fourFrame);
@@ -1624,7 +1594,7 @@ int testingFunction() {
 		streamL.enqueueUpload(leftFrame, imageLSrc);
 		streamL.waitForCompletion();
 		streamR.enqueueUpload(rightFrame, imageRSrc);
-		streamR.waitForCompletion();
+		streamR.waitForCompletion();*/
 
 #ifdef DEBUG_IMAGES
 		/*stream5.enqueueDownload(result5, outFiveFrame);
@@ -1650,10 +1620,10 @@ int testingFunction() {
 		gpu::warpPerspective(image5Src, result5, H5, cv::Size(resultHeight + 600, resultWidth), cv::INTER_NEAREST | CV_WARP_FILL_OUTLIERS, stream5);
 		//gpu::warpPerspective(image6Src, result6, H6, cv::Size(resultHeight + 600, resultWidth), cv::INTER_NEAREST | CV_WARP_FILL_OUTLIERS);
 		*/
-		std::cout << H4 << std::endl;
+		/*std::cout << H4 << std::endl;
 		gpu::warpPerspective(image4Src, result4, H4, cv::Size(resultHeight + 600, resultWidth), 1, 0, cv::Scalar(), stream4);
 		stream4.waitForCompletion();
-
+*/
 #ifdef TEST_FAIL
 		cv::Mat testFrameresult4(result4.size(), result4.type());
 		cv::Mat testImage4Src(image4Src.size(), image4Src.type());
@@ -1664,18 +1634,18 @@ int testingFunction() {
 		cv::waitKey(10);
 #endif
 
-		gpu::warpPerspective(imageRSrc, resultR, HR, cv::Size(resultHeight + 600, resultWidth), 1, 0, cv::Scalar(), streamR);
-		streamR.waitForCompletion();
-		gpu::warpPerspective(imageLSrc, resultL, HL, cv::Size(resultHeight + 600, resultWidth), 1, 0, cv::Scalar(), streamL);
-		streamL.waitForCompletion();
+		//gpu::warpPerspective(imageRSrc, resultR, HR, cv::Size(resultHeight + 600, resultWidth), 1, 0, cv::Scalar(), streamR);
+		//streamR.waitForCompletion();
+		//gpu::warpPerspective(imageLSrc, resultL, HL, cv::Size(resultHeight + 600, resultWidth), 1, 0, cv::Scalar(), streamL);
+		//streamL.waitForCompletion();
 
-		//gpu::resize(image4Src, result4, cv::Size(resultHeight + 600, resultWidth));
-		gpu::warpPerspective(image5Src, result5, H5, cv::Size(resultHeight + 600, resultWidth), 1, 0, cv::Scalar(), stream5);
-		stream5.waitForCompletion();
+		////gpu::resize(image4Src, result4, cv::Size(resultHeight + 600, resultWidth));
+		//gpu::warpPerspective(image5Src, result5, H5, cv::Size(resultHeight + 600, resultWidth), 1, 0, cv::Scalar(), stream5);
+		//stream5.waitForCompletion();
 
 
-		gpu::warpPerspective(imageBSrc, resultB, trans, cv::Size(resultHeight + 600, resultWidth), 1, 0, cv::Scalar(), streamB);
-		streamB.waitForCompletion();
+		//gpu::warpPerspective(imageBSrc, resultB, trans, cv::Size(resultHeight + 600, resultWidth), 1, 0, cv::Scalar(), streamB);
+		//streamB.waitForCompletion();
 
 		/*
 		gpu::absdiff(result5, resultL, result5, stream5);
@@ -1683,7 +1653,7 @@ int testingFunction() {
 		gpu::absdiff(result5, resultR, result5, stream5);
 		gpu::absdiff(result5, result4, result5, stream5);
 		*/
-		stream5.enqueueDownload(result5, outFiveFrame);
+		/*stream5.enqueueDownload(result5, outFiveFrame);
 		stream5.waitForCompletion();
 		streamL.enqueueDownload(resultL, outLeftFrame);
 		streamL.waitForCompletion();
@@ -1694,10 +1664,8 @@ int testingFunction() {
 		stream4.enqueueDownload(result4, outFourFrame);
 
 		stream4.waitForCompletion();
-
-
-
-
+*/
+		IO->IO_warpPerspective(FRAMES, RESULTS, EXTRINSICCOEFFS, cv::Size(resultHeight + 600, resultWidth));
 
 		//cv::imshow("OUTFIVEFRAMEafter download", outFourFrame);
 #ifdef DEBUG_INFO
@@ -1901,24 +1869,24 @@ int testingFunction() {
 					*/
 					if (j < result.rows && i < fifthLimit){
 						c5_0 = true;
-						c5 = outFiveFrame.at<uchar>(j, i);
+						c5 = RESULTS[4].at<uchar>(j, i);
 					}
 					if (j < result.rows && i < leftLimit && i > fifthLimit){
 						cL_0 = true;
-						cL = outLeftFrame.at<uchar>(j, i);
+						cL = RESULTS[1].at<uchar>(j, i);
 					}
-					if (j < baseFrame.rows && i>baseLeftLimit && i < baseRightLimit) {
+					if (j < RESULTS[0].rows && i>baseLeftLimit && i < baseRightLimit) {
 						//cout << "cB is true" << endl;
 						cB_0 = true;
-						cB = outBaseFrame.at<uchar>(j, i);
+						cB = RESULTS[0].at<uchar>(j, i);
 					}
 					if (j < result.rows && i>rightLimit && i < fourLimit) {
 						cR_0 = true;
-						cR = outRightFrame.at<uchar>(j, i);
+						cR = RESULTS[2].at<uchar>(j, i);
 					}
 					if (j < result.rows && i> fourLimit) {
 						c4_0 = true;
-						c4 = outFourFrame.at<uchar>(j, i);
+						c4 = RESULTS[3].at<uchar>(j, i);
 					}
 
 
