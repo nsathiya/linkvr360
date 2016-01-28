@@ -21,9 +21,15 @@
     <ClCompile Include="ImageOps.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="CameraOps.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ImageOps.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CameraOps.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

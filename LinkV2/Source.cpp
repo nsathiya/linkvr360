@@ -16,7 +16,9 @@
 #include <opencv2/highgui/highgui_c.h>
 #include "opencv2/imgproc/imgproc_c.h"
 #include "opencv2/nonfree/nonfree.hpp"
+
 #include "ImageOps.h"
+#include "CameraOps.h"
 
 using namespace std;
 using namespace cv;
@@ -281,73 +283,45 @@ void BaseCallBackFunc(int event, int x, int y, int flags, void* userdata)
 
 int showFrames()
 {
-	cv::VideoCapture capL(LEFT_CAM), capB(BASE_CAM), capR(RIGHT_CAM), cap4(FOUR_CAM), cap5(FIFTH_CAM), cap6(BACK_CAM);
 
-	capR.set(CV_CAP_PROP_FRAME_WIDTH, 400);
-	capR.set(CV_CAP_PROP_FRAME_HEIGHT, 300);
-	capB.set(CV_CAP_PROP_FRAME_WIDTH, 400);
-	capB.set(CV_CAP_PROP_FRAME_HEIGHT, 300);
-	capL.set(CV_CAP_PROP_FRAME_WIDTH, 400);
-	capL.set(CV_CAP_PROP_FRAME_HEIGHT, 300);
-	cap4.set(CV_CAP_PROP_FRAME_WIDTH, 400);
-	cap4.set(CV_CAP_PROP_FRAME_HEIGHT, 300);
-	cap5.set(CV_CAP_PROP_FRAME_WIDTH, 400);
-	cap5.set(CV_CAP_PROP_FRAME_HEIGHT, 300);
-	cap6.set(CV_CAP_PROP_FRAME_WIDTH, 400);
-	cap6.set(CV_CAP_PROP_FRAME_HEIGHT, 300);
+	std::vector<int> cameraPorts(NO_OF_CAMS);
+	cameraPorts[0] = (BASE_CAM);
+	cameraPorts[1] = (LEFT_CAM);
+	cameraPorts[2] = (RIGHT_CAM);
+	cameraPorts[3] = (FOUR_CAM);
+	cameraPorts[4] = (FIFTH_CAM);
+
+	CameraOps *CO = new CameraOps(cameraPorts);
+	CO->CO_setProp(CV_CAP_PROP_FRAME_WIDTH, 400);
+	CO->CO_setProp(CV_CAP_PROP_FRAME_HEIGHT, 300);
 
 	double Brightness;
 	double Contrast;
 	double Saturation;
 	double Gain;
 
-	Brightness = capB.get(CV_CAP_PROP_BRIGHTNESS);
-	Contrast = capB.get(CV_CAP_PROP_CONTRAST);
-	Saturation = capB.get(CV_CAP_PROP_SATURATION);
-	Gain = capB.get(CV_CAP_PROP_GAIN);
+	Brightness = CO->CO_getProp(CV_CAP_PROP_BRIGHTNESS, 0);
+	Contrast = CO->CO_getProp(CV_CAP_PROP_CONTRAST, 0);
+	Saturation = CO->CO_getProp(CV_CAP_PROP_SATURATION, 0);
+	Gain = CO->CO_getProp(CV_CAP_PROP_GAIN, 0);
 
 	cout << "Brightness: " << Brightness;
 	cout << "Contrast: " << Contrast;
 	cout << "Saturation: " << Saturation;
 	cout << "Gain: " << Gain;
 
-	capB.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
-	capL.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
-	capR.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
-	cap4.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
-	cap5.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
+	CO->CO_setProp(CV_CAP_PROP_BRIGHTNESS, Brightness);
+	CO->CO_setProp(CV_CAP_PROP_CONTRAST, Contrast);
+	CO->CO_setProp(CV_CAP_PROP_SATURATION, Saturation);
+	CO->CO_setProp(CV_CAP_PROP_GAIN, Gain);
 
-	capB.set(CV_CAP_PROP_CONTRAST, Contrast);
-	capL.set(CV_CAP_PROP_CONTRAST, Contrast);
-	capR.set(CV_CAP_PROP_CONTRAST, Contrast);
-	cap4.set(CV_CAP_PROP_CONTRAST, Contrast);
-	cap5.set(CV_CAP_PROP_CONTRAST, Contrast);
-
-	capB.set(CV_CAP_PROP_SATURATION, Saturation);
-	capL.set(CV_CAP_PROP_SATURATION, Saturation);
-	capR.set(CV_CAP_PROP_SATURATION, Saturation);
-	cap4.set(CV_CAP_PROP_SATURATION, Saturation);
-	cap5.set(CV_CAP_PROP_SATURATION, Saturation);
-
-	capB.set(CV_CAP_PROP_GAIN, Gain);
-	capL.set(CV_CAP_PROP_GAIN, Gain);
-	capR.set(CV_CAP_PROP_GAIN, Gain);
-	cap4.set(CV_CAP_PROP_GAIN, Gain);
-	cap5.set(CV_CAP_PROP_GAIN, Gain);
-
-
-	int frameWidth = capR.get(CV_CAP_PROP_FRAME_WIDTH)*0.25;
-	int frameHeight = capR.get(CV_CAP_PROP_FRAME_HEIGHT)*0.25;
-	//cv::VideoWriter outputVideo;
+	int frameWidth = CO->CO_getProp(CV_CAP_PROP_FRAME_WIDTH, 0)*0.25;
+	int frameHeight = CO->CO_getProp(CV_CAP_PROP_FRAME_HEIGHT, 0)*0.25;
 	cv::Mat leftFrame, rightFrame, fourFrame, fifthFrame, sixFrame;
 
 	while (1)
 	{
-		capB >> FRAMES[0];
-		capL >> FRAMES[1];
-		capR >> FRAMES[2];
-		cap4 >> FRAMES[3];
-		cap5 >> FRAMES[4];
+		CO->CO_captureFrames(FRAMES);
 
 		if (waitKey(100) == 110)
 			break;
@@ -359,7 +333,7 @@ int showFrames()
 		imshow("five Frame",  FRAMES[4]);
 		//imshow("sixth Frame", sixFrame);
 	}
-
+	delete CO;
 	return 1;
 }
 
