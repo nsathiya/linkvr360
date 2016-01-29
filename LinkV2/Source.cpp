@@ -283,14 +283,12 @@ void BaseCallBackFunc(int event, int x, int y, int flags, void* userdata)
 
 int showFrames()
 {
-
 	std::vector<int> cameraPorts(NO_OF_CAMS);
-	cameraPorts[0] = (BASE_CAM);
-	cameraPorts[1] = (LEFT_CAM);
-	cameraPorts[2] = (RIGHT_CAM);
-	cameraPorts[3] = (FOUR_CAM);
-	cameraPorts[4] = (FIFTH_CAM);
-
+	cameraPorts[0] = BASE_CAM;
+	cameraPorts[1] = LEFT_CAM;
+	cameraPorts[2] = RIGHT_CAM;
+	cameraPorts[3] = FOUR_CAM;
+	cameraPorts[4] = FIFTH_CAM;
 	CameraOps *CO = new CameraOps(cameraPorts);
 	CO->CO_setProp(CV_CAP_PROP_FRAME_WIDTH, 400);
 	CO->CO_setProp(CV_CAP_PROP_FRAME_HEIGHT, 300);
@@ -424,7 +422,7 @@ int stitchLive()
 	cap6 = cap5 = cap4 = capR = capL = capB;
 #endif
 
-
+	
 	cv::VideoWriter outputVideo;
 	cv::Mat result, leftFrame, baseFrame, rightFrame, fourFrame, fiveFrame, sixFrame;
 	cv::Mat undistortedLeftFrame, undistortedBaseFrame, undistortedRightFrame, undistortedFourFrame, undistortedFiveFrame, undistortedSixFrame;
@@ -1211,8 +1209,16 @@ int use360Camera()
 int testingFunction() {
 	
 	cout << "Stitching... \n" << endl;
-	cv::VideoCapture capL(LEFT_CAM), capB(BASE_CAM), capR(RIGHT_CAM), cap4(FOUR_CAM), cap5(FIFTH_CAM), cap6(BACK_CAM);
 
+	std::vector<int> cameraPorts(NO_OF_CAMS);
+	cameraPorts[0] = BASE_CAM;
+	cameraPorts[1] = LEFT_CAM;
+	cameraPorts[2] = RIGHT_CAM;
+	cameraPorts[3] = FOUR_CAM;
+	cameraPorts[4] = FIFTH_CAM;
+	CameraOps *CO = new CameraOps(cameraPorts);
+	cv::VideoCapture capL(LEFT_CAM), capB(BASE_CAM), capR(RIGHT_CAM), cap4(FOUR_CAM), cap5(FIFTH_CAM), cap6(BACK_CAM);
+	
 	cv::VideoWriter outputVideo;
 	cv::Mat result, leftFrame, baseFrame, rightFrame, fourFrame, fiveFrame, sixFrame;
 	cv::Mat undistortedLeftFrame, undistortedBaseFrame, undistortedRightFrame, undistortedFourFrame, undistortedFiveFrame, undistortedSixFrame;
@@ -1221,70 +1227,34 @@ int testingFunction() {
 	cv::Mat resultL, resultB, resultR, resultMask, result4, result5, result6;
 
 	std::vector<cv::Point2f> scene_cornersLeft, scene_cornersRight, scene_cornersBase, scene_cornersFour, scene_cornersFive, scene_cornersSix, scene_corners;
-	capL.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
-	capL.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
-	capR.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
-	capR.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
-	capB.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
-	capB.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
-	cap4.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
-	cap4.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
-	cap5.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
-	cap5.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
-	cap6.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
-	cap6.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
+	CO->CO_setProp(CV_CAP_PROP_FRAME_WIDTH, 1920);
+	CO->CO_setProp(CV_CAP_PROP_FRAME_HEIGHT, 1080);
 
 	double Brightness;
 	double Contrast;
 	double Saturation;
 	double Gain;
 
-	Brightness = capB.get(CV_CAP_PROP_BRIGHTNESS);
-	Contrast = capB.get(CV_CAP_PROP_CONTRAST);
-	Saturation = capB.get(CV_CAP_PROP_SATURATION);
-	Gain = capB.get(CV_CAP_PROP_GAIN);
+	Brightness = CO->CO_getProp(CV_CAP_PROP_BRIGHTNESS, 0); 
+	Contrast = CO->CO_getProp(CV_CAP_PROP_CONTRAST, 0);
+	Saturation = CO->CO_getProp(CV_CAP_PROP_SATURATION, 0);
+	Gain = CO->CO_getProp(CV_CAP_PROP_GAIN, 0);
 
 	cout << "Brightness: " << Brightness;
 	cout << "Contrast: " << Contrast;
 	cout << "Saturation: " << Saturation;
 	cout << "Gain: " << Gain;
 
-	capB.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
-	capL.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
-	capR.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
-	cap4.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
-	cap5.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
-
-	capB.set(CV_CAP_PROP_CONTRAST, Contrast);
-	capL.set(CV_CAP_PROP_CONTRAST, Contrast);
-	capR.set(CV_CAP_PROP_CONTRAST, Contrast);
-	cap4.set(CV_CAP_PROP_CONTRAST, Contrast);
-	cap5.set(CV_CAP_PROP_CONTRAST, Contrast);
-
-	capB.set(CV_CAP_PROP_SATURATION, Saturation);
-	capL.set(CV_CAP_PROP_SATURATION, Saturation);
-	capR.set(CV_CAP_PROP_SATURATION, Saturation);
-	cap4.set(CV_CAP_PROP_SATURATION, Saturation);
-	cap5.set(CV_CAP_PROP_SATURATION, Saturation);
-
-	capB.set(CV_CAP_PROP_GAIN, Gain);
-	capL.set(CV_CAP_PROP_GAIN, Gain);
-	capR.set(CV_CAP_PROP_GAIN, Gain);
-	cap4.set(CV_CAP_PROP_GAIN, Gain);
-	cap5.set(CV_CAP_PROP_GAIN, Gain);
-
+	CO->CO_setProp(CV_CAP_PROP_BRIGHTNESS, Brightness);
+	CO->CO_setProp(CV_CAP_PROP_CONTRAST, Contrast);
+	CO->CO_setProp(CV_CAP_PROP_SATURATION, Saturation);
+	CO->CO_setProp(CV_CAP_PROP_GAIN, Gain);
 
 	int frameWidth = capL.get(CV_CAP_PROP_FRAME_WIDTH)*0.25;
 	int frameHeight = capL.get(CV_CAP_PROP_FRAME_HEIGHT)*0.25;
 	int resultWidth = frameHeight * 2;
 	int resultHeight = frameWidth + 100;
 	bool record = false;
-	/*resultL = gpu::GpuMat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	resultR = gpu::GpuMat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	resultB = gpu::GpuMat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	result4 = gpu::GpuMat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	result5 = gpu::GpuMat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	result6 = gpu::GpuMat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);*/
 	RESULTS[0] = resultB = cv::Mat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
 	RESULTS[1] = resultL = cv::Mat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
 	RESULTS[2] = resultR = cv::Mat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
@@ -1314,12 +1284,7 @@ int testingFunction() {
 
 	cout << "finished getting matrix" << endl;
 
-	capB >> FRAMES[0];
-	capL >> FRAMES[1];
-	capR >> FRAMES[2];
-	cap4 >> FRAMES[3];
-	cap5 >> FRAMES[4];
-
+	CO->CO_captureFrames(FRAMES);
 
 	if (FRAMES[0].cols == 0) {
 		cout << "Error reading file " << endl;
@@ -1449,12 +1414,7 @@ int testingFunction() {
 		frameNo++;
 		int _startWhileLoop = (int)getTickCount();
 		
-		capB >> FRAMES[0];
-		capL >> FRAMES[1];
-		capR >> FRAMES[2];
-		cap4 >> FRAMES[3];
-		cap5 >> FRAMES[4];
-
+		CO->CO_captureFrames(FRAMES);
 		//imshow("base Frame", baseFrame);
 		if (useGrayScale) {	
 			IO->IO_cvtColor(FRAMES, CV_RGB2GRAY);
@@ -1483,27 +1443,11 @@ int testingFunction() {
 
 		if (!useGrayScale) {
 
-#ifdef DEBUG_IMAGES
-			cv::imshow("1", outFiveFrame);
-			cv::imshow("2", outLeftFrame);
-			cv::imshow("3", outRightFrame);
-			cv::imshow("4", outBaseFrame);
-			cv::imshow("5", outFourFrame);
-			cv::waitKey(10);
-#endif
 			/// JH: Added RGB support using cv::Vec3b when grayScale option is disabled
 			for (int j = 0; j < result.rows; ++j)
 				for (int i = 0; i < result.cols; ++i)
 				{
-					//cout << "blending" << endl;
-					/**
-					cv::Vec3b cL(0, 0, 0);
-					cv::Vec3b cB(0, 0, 0);
-					cv::Vec3b cR(0, 0, 0);
-					cv::Vec3b cLB(0, 0, 0);
-					cv::Vec3b cBR(0, 0, 0);
-					cv::Vec3b color(0, 0, 0);
-					*/
+
 					float blendA = 0.8;
 					cv::Vec3b cL;
 					cv::Vec3b cB;
@@ -1765,13 +1709,6 @@ int testingFunction() {
 		}
 
 		croppedImage = result(Rect(topLeft.x, topLeft.y, croppedWidth, croppedHeight));
-
-		//cv::imshow("left", outLeftFrame);
-		//cv::imshow("right", outRightFrame);
-		//cv::imshow("base", outBaseFrame);
-		//cv::imshow("four", outFourFrame);
-		//cv::imshow("five", outFiveFrame);
-		//cv::imshow("Result", result);
 		if (croppedImage.channels() == 3) {
 			cv::cvtColor(croppedImage, croppedImage, CV_RGB2BGR);
 		}
