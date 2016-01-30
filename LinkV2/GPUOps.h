@@ -19,12 +19,15 @@
 class GPUOps
 {
 public:
-	GPUOps();
+	GPUOps(int NO_OF_CAMS);
 	~GPUOps();
-	void uploadStream(std::vector<cv::Mat> &FRAMES);
+	void GO_uploadStream(std::vector<cv::Mat> &FRAMES);
+	void GO_perspectiveTransform(std::vector<cv::Mat> externalCoeffs, int resultHeight, int resultWidth);
+	void GPUOps::GO_downloadStream(std::vector<cv::Mat> &RESULTS);
 
 private:
-	std::vector<cv::gpu::GpuMat> SOURCEFRAMES;
-	std::vector<cv::gpu::GpuMat> DESTINFRAMES;
+	std::vector<cv::gpu::GpuMat> IMAGEFRAMES;
+	std::vector<cv::gpu::GpuMat> RESULTFRAMES;
+	std::vector<cv::gpu::Stream> streams;
 };
 

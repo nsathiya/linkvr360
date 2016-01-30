@@ -19,15 +19,16 @@
 
 #include "ImageOps.h"
 #include "CameraOps.h"
+#include "GPUOps.h"
 
 using namespace std;
 using namespace cv;
 
 const int BASE_CAM = 1; // 4; // 1; //0;
-const int LEFT_CAM = 3; // 2; // 4; // 2;
+const int LEFT_CAM = 2; // 3; // 2; // 4; // 2;
 const int RIGHT_CAM = 4; // 1; // 4; // 2; // 3; // 1;
 const int FOUR_CAM = 0; // 0; // 4;
-const int FIFTH_CAM = 2; // 3; // 2; // 3;
+const int FIFTH_CAM = 3; // 2; // 3; // 2; // 3;
 const int BACK_CAM = 5;
 const int NO_OF_CAMS = 5;
 
@@ -70,9 +71,12 @@ int showFrames();
 int stitch();
 int record();
 int stitchLive();
+int stitchLiveWOGPU();
+int stitchLiveWGPU();
 int use360Camera();
 int recordSimple();
 int testingFunction();
+
 cv::Point2f convert_pt(cv::Point2f point, int w, int h, int INV_FLAG, float F);
 cv::Mat rectlinearProject(Mat ImgToCalibrate, bool INV_FLAG, float F);
 int calibrateCamerasInternal(int cam);
@@ -97,6 +101,8 @@ int main() {
 		"Press 'c' for External Calibration.\n"
 		"Press 'i' for Internal Calibration.\n"
 		"Press 'g' for B&W/Color mode switching.\n Current mode is Color. \n"
+		"Press 'a' for Stitch Live without GPU. \n"
+		"Press 'b' for Stitch Live with GPU \n"
 		"Press 't' for testing function.\n";
 	std::cout << MainMenu << std::endl;
 
@@ -108,6 +114,16 @@ int main() {
 		if (optionSelected == 's')
 		{
 			if (stitchLive() == 1)
+				return 0;
+		}
+		if (optionSelected == 'a')
+		{
+			if (stitchLiveWOGPU() == 1)
+				return 0;
+		}
+		if (optionSelected == 'b')
+		{
+			if (stitchLiveWGPU() == 1)
 				return 0;
 		}
 		if (optionSelected == 'r')
@@ -416,83 +432,71 @@ cv::Point2f convert_pt(cv::Point2f point, int w, int h, int INV_FLAG, float F)
 
 int stitchLive()
 {
-	cout << "Stitching... \n" << endl;
-	cv::VideoCapture capL(LEFT_CAM), capB(BASE_CAM), capR(RIGHT_CAM), cap4(FOUR_CAM), cap5(FIFTH_CAM), cap6(BACK_CAM);
-#ifdef TESTING
-	cap6 = cap5 = cap4 = capR = capL = capB;
-#endif
 
-	
+	return 1;
+}
+
+
+int use360Camera()
+{
+	if (record() == 1)
+		stitch();
+
+	return 1;
+
+}
+
+int testingFunction() {
+
+	return 1;
+}
+
+int stitchLiveWGPU() {
+
+	cout << "Stitching with GPU... \n" << endl;
+
+	std::vector<int> cameraPorts(NO_OF_CAMS);
+	cameraPorts[0] = BASE_CAM;
+	cameraPorts[1] = LEFT_CAM;
+	cameraPorts[2] = RIGHT_CAM;
+	cameraPorts[3] = FOUR_CAM;
+	cameraPorts[4] = FIFTH_CAM;
+	CameraOps *CO = new CameraOps(cameraPorts);
+	ImageOps *IO = new ImageOps();
+	GPUOps *GO = new GPUOps(NO_OF_CAMS);
+
 	cv::VideoWriter outputVideo;
-	cv::Mat result, leftFrame, baseFrame, rightFrame, fourFrame, fiveFrame, sixFrame;
-	cv::Mat undistortedLeftFrame, undistortedBaseFrame, undistortedRightFrame, undistortedFourFrame, undistortedFiveFrame, undistortedSixFrame;
+	cv::Mat result;
 
-	gpu::GpuMat resultL, resultB, resultR, resultMask, result4, result5, result6;
 	std::vector<cv::Point2f> scene_cornersLeft, scene_cornersRight, scene_cornersBase, scene_cornersFour, scene_cornersFive, scene_cornersSix, scene_corners;
-	capL.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
-	capL.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
-	capR.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
-	capR.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
-	capB.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
-	capB.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
-	cap4.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
-	cap4.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
-	cap5.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
-	cap5.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
-	cap6.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
-	cap6.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
+	CO->CO_setProp(CV_CAP_PROP_FRAME_WIDTH, 1920);
+	CO->CO_setProp(CV_CAP_PROP_FRAME_HEIGHT, 1080);
 
 	double Brightness;
 	double Contrast;
 	double Saturation;
 	double Gain;
 
-	Brightness = capB.get(CV_CAP_PROP_BRIGHTNESS);
-	Contrast = capB.get(CV_CAP_PROP_CONTRAST);
-	Saturation = capB.get(CV_CAP_PROP_SATURATION);
-	Gain = capB.get(CV_CAP_PROP_GAIN);
+	Brightness = CO->CO_getProp(CV_CAP_PROP_BRIGHTNESS, 0);
+	Contrast = CO->CO_getProp(CV_CAP_PROP_CONTRAST, 0);
+	Saturation = CO->CO_getProp(CV_CAP_PROP_SATURATION, 0);
+	Gain = CO->CO_getProp(CV_CAP_PROP_GAIN, 0);
 
 	cout << "Brightness: " << Brightness;
 	cout << "Contrast: " << Contrast;
 	cout << "Saturation: " << Saturation;
 	cout << "Gain: " << Gain;
 
-	capB.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
-	capL.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
-	capR.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
-	cap4.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
-	cap5.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
+	CO->CO_setProp(CV_CAP_PROP_BRIGHTNESS, Brightness);
+	CO->CO_setProp(CV_CAP_PROP_CONTRAST, Contrast);
+	CO->CO_setProp(CV_CAP_PROP_SATURATION, Saturation);
+	CO->CO_setProp(CV_CAP_PROP_GAIN, Gain);
 
-	capB.set(CV_CAP_PROP_CONTRAST, Contrast);
-	capL.set(CV_CAP_PROP_CONTRAST, Contrast);
-	capR.set(CV_CAP_PROP_CONTRAST, Contrast);
-	cap4.set(CV_CAP_PROP_CONTRAST, Contrast);
-	cap5.set(CV_CAP_PROP_CONTRAST, Contrast);
-
-	capB.set(CV_CAP_PROP_SATURATION, Saturation);
-	capL.set(CV_CAP_PROP_SATURATION, Saturation);
-	capR.set(CV_CAP_PROP_SATURATION, Saturation);
-	cap4.set(CV_CAP_PROP_SATURATION, Saturation);
-	cap5.set(CV_CAP_PROP_SATURATION, Saturation);
-
-	capB.set(CV_CAP_PROP_GAIN, Gain);
-	capL.set(CV_CAP_PROP_GAIN, Gain);
-	capR.set(CV_CAP_PROP_GAIN, Gain);
-	cap4.set(CV_CAP_PROP_GAIN, Gain);
-	cap5.set(CV_CAP_PROP_GAIN, Gain);
-
-
-	int frameWidth = capL.get(CV_CAP_PROP_FRAME_WIDTH)*0.25;
-	int frameHeight = capL.get(CV_CAP_PROP_FRAME_HEIGHT)*0.25;
+	int frameWidth = CO->CO_getProp(CV_CAP_PROP_FRAME_WIDTH, 0)*0.25;
+	int frameHeight = CO->CO_getProp(CV_CAP_PROP_FRAME_HEIGHT, 0)*0.25;
 	int resultWidth = frameHeight * 2;
 	int resultHeight = frameWidth + 100;
 	bool record = false;
-	resultL = gpu::GpuMat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	resultR = gpu::GpuMat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	resultB = gpu::GpuMat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	result4 = gpu::GpuMat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	result5 = gpu::GpuMat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	result6 = gpu::GpuMat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
 	result = Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
 
 	// Move Scene to the right by 100
@@ -502,6 +506,7 @@ int stitchLive()
 	float transdata[] = { 1.0, 0.0, x_offset, 0.0, 1.0, y_offset, 0.0, 0.0, 1.0 };
 	cv::Mat trans(3, 3, CV_32FC1, transdata);
 	cout << "HR: " << HR << endl;
+	EXTRINSICCOEFFS[0] = trans;
 
 	Mat HR_m = HR.clone();
 	Mat HL_m = HL.clone();
@@ -513,72 +518,40 @@ int stitchLive()
 
 	cout << "finished getting matrix" << endl;
 
-	capL.read(leftFrame);
-	capR.read(rightFrame);
-	capB.read(baseFrame);
-	cap4.read(fourFrame);
-	cap5.read(fiveFrame);
-	//cap6.read(sixFrame);
+	CO->CO_captureFrames(FRAMES);
 
-
-	if (fiveFrame.cols == 0) {
+	if (FRAMES[0].cols == 0) {
 		cout << "Error reading file " << endl;
 		return -1;
 	}
-	resize(leftFrame, leftFrame, cv::Size(frameWidth, frameHeight));
-	resize(baseFrame, baseFrame, cv::Size(frameWidth, frameHeight));
-	resize(rightFrame, rightFrame, cv::Size(frameWidth, frameHeight));
-	resize(fourFrame, fourFrame, cv::Size(frameWidth, frameHeight));
-	resize(fiveFrame, fiveFrame, cv::Size(frameWidth, frameHeight));
-	//resize(sixFrame, sixFrame, cv::Size(frameWidth, frameHeight));
 
-	cv::transpose(baseFrame, baseFrame);
-	cv::transpose(rightFrame, rightFrame);
-	cv::transpose(leftFrame, leftFrame);
-	cv::transpose(fourFrame, fourFrame);
-	cv::transpose(fiveFrame, fiveFrame);
-	//cv::transpose(sixFrame, sixFrame);
-	cv::flip(baseFrame, baseFrame, 1);
-	cv::flip(rightFrame, rightFrame, 1);
-	cv::flip(leftFrame, leftFrame, 1);
-	cv::flip(fourFrame, fourFrame, 1);
-	cv::flip(fiveFrame, fiveFrame, 1);
-	//cv::flip(sixFrame, sixFrame, 1);
-	undistort(leftFrame, undistortedLeftFrame, leftIntrinsic, leftDistCoeffs);
-	undistort(baseFrame, undistortedBaseFrame, baseIntrinsic, baseDistCoeffs);
-	undistort(rightFrame, undistortedRightFrame, rightIntrinsic, rightDistCoeffs);
-	undistort(fourFrame, undistortedFourFrame, fourIntrinsic, fourDistCoeffs);
-	undistort(fiveFrame, undistortedFiveFrame, fiveIntrinsic, fiveDistCoeffs);
-	//undistort(sixFrame, undistortedSixFrame, sixIntrinsic, sixDistCoeffs);
-	leftFrame = undistortedLeftFrame;
-	baseFrame = undistortedBaseFrame;
-	rightFrame = undistortedRightFrame;
-	fourFrame = undistortedFourFrame;
-	fiveFrame = undistortedFiveFrame;
-	//sixFrame = undistortedSixFrame;
+	IO->IO_resize(FRAMES, cv::Size(frameWidth, frameHeight));
+	IO->IO_transpose(FRAMES);
+	IO->IO_flip(FRAMES, 1);
+	IO->IO_undistort(FRAMES, INTRINSICCOEFFS, DISTORTIONCOEFFS);
 
 	// Use the Homography Matrix to warp the images
 	scene_corners.clear();
-	scene_cornersLeft.push_back(Point2f(0.0, 0.0));
-	scene_cornersLeft.push_back(Point2f(leftFrame.cols, 0.0));
-	scene_cornersLeft.push_back(Point2f(0.0, leftFrame.rows));
-	scene_cornersLeft.push_back(Point2f(leftFrame.cols, leftFrame.rows));
-	scene_cornersRight.push_back(Point2f(0.0, 0.0));
-	scene_cornersRight.push_back(Point2f(rightFrame.cols, 0.0));
-	scene_cornersRight.push_back(Point2f(0.0, rightFrame.rows));
-	scene_cornersRight.push_back(Point2f(rightFrame.cols, leftFrame.rows));
 	scene_cornersBase.push_back(Point2f(0.0, 0.0));
-	scene_cornersBase.push_back(Point2f(baseFrame.cols, 0.0));
-	scene_cornersBase.push_back(Point2f(0.0, baseFrame.rows));
-	scene_cornersBase.push_back(Point2f(baseFrame.cols, baseFrame.rows));
+	scene_cornersBase.push_back(Point2f(FRAMES[0].cols, 0.0));
+	scene_cornersBase.push_back(Point2f(0.0, FRAMES[0].rows));
+	scene_cornersBase.push_back(Point2f(FRAMES[0].cols, FRAMES[0].rows));
+	scene_cornersLeft.push_back(Point2f(0.0, 0.0));
+	scene_cornersLeft.push_back(Point2f(FRAMES[1].cols, 0.0));
+	scene_cornersLeft.push_back(Point2f(0.0, FRAMES[1].rows));
+	scene_cornersLeft.push_back(Point2f(FRAMES[1].cols, FRAMES[1].rows));
+	scene_cornersRight.push_back(Point2f(0.0, 0.0));
+	scene_cornersRight.push_back(Point2f(FRAMES[2].cols, 0.0));
+	scene_cornersRight.push_back(Point2f(0.0, FRAMES[2].rows));
+	scene_cornersRight.push_back(Point2f(FRAMES[2].cols, FRAMES[2].rows));
 	scene_cornersFour.push_back(Point2f(0.0, 0.0));
-	scene_cornersFour.push_back(Point2f(fourFrame.cols, 0.0));
-	scene_cornersFour.push_back(Point2f(0.0, fourFrame.rows));
-	scene_cornersFour.push_back(Point2f(fourFrame.cols, fourFrame.rows));
+	scene_cornersFour.push_back(Point2f(FRAMES[3].cols, 0.0));
+	scene_cornersFour.push_back(Point2f(0.0, FRAMES[3].rows));
+	scene_cornersFour.push_back(Point2f(FRAMES[3].cols, FRAMES[3].rows));
 	scene_cornersFive.push_back(Point2f(0.0, 0.0));
-	scene_cornersFive.push_back(Point2f(fiveFrame.cols, 0.0));
-	scene_cornersFive.push_back(Point2f(0.0, fiveFrame.rows));
-	scene_cornersFive.push_back(Point2f(fiveFrame.cols, fiveFrame.rows));
+	scene_cornersFive.push_back(Point2f(FRAMES[4].cols, 0.0));
+	scene_cornersFive.push_back(Point2f(0.0, FRAMES[4].rows));
+	scene_cornersFive.push_back(Point2f(FRAMES[4].cols, FRAMES[4].rows));
 	//scene_cornersSix.push_back(Point2f(0.0, 0.0));
 	//scene_cornersSix.push_back(Point2f(sixFrame.cols, 0.0));
 	//scene_cornersSix.push_back(Point2f(0.0, sixFrame.rows));
@@ -599,7 +572,7 @@ int stitchLive()
 	//sixLimit = scene_cornersSix[1].x;
 	leftLimit = scene_cornersLeft[1].x;
 	baseLeftLimit = x_offset;
-	baseRightLimit = x_offset + baseFrame.cols;
+	baseRightLimit = x_offset + FRAMES[0].cols;
 	rightLimit = scene_cornersRight[0].x;
 	fourLimit = scene_cornersFour[0].x;
 	Mat croppedImage;
@@ -647,27 +620,21 @@ int stitchLive()
 	float _totalSPF = 0;
 
 	//Get GPU ready
-	cv::gpu::setDevice(0);
-	cv::Mat tmp;
-	capL.read(tmp);
-	cv::gpu::GpuMat templ_d(tmp); // Warm up the cores
+	//cv::gpu::setDevice(0);
+	//cv::Mat tmp(FRAMES[0]);
+	//capL.read(tmp);
+	//tmp = FRAMES[0];
+	//cv::gpu::GpuMat templ_d(tmp); // Warm up the cores
 
 	//Initialize needed variables for GPU
-	cv::gpu::GpuMat imageBSrc, imageBDst, imageRSrc, imageRDst, imageLSrc, image4Src, image4Dst, image5Src, image5Dst, imageLDst, image6Dst, image6Src;
 	cv::Mat outLeftFrame, outRightFrame, outBaseFrame, outFourFrame, outFiveFrame, outSixFrame;
-	outLeftFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
-	outRightFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
-	outBaseFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
-	outFourFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
-	outFiveFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
-	outSixFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
+	RESULTS[0] = outLeftFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
+	RESULTS[1] = outRightFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
+	RESULTS[2] = outBaseFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
+	RESULTS[3] = outFourFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
+	RESULTS[4] = outFiveFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
+	//outSixFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
 
-	cv::Mat middlewareLeftFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	cv::Mat middlewareRightFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	cv::Mat middlewareBaseFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	cv::Mat middlewareFourFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	cv::Mat middlewareFiveFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	cv::Mat middlewareSixFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
 	cv::gpu::Stream streamL, streamR, streamB, stream4, stream5, stream6;
 
 	//Start processing
@@ -675,215 +642,21 @@ int stitchLive()
 	{
 		frameNo++;
 		int _startWhileLoop = (int)getTickCount();
-		capL.read(leftFrame);
-		capR.read(rightFrame);
-		capB.read(baseFrame);
-		cap4.read(fourFrame);
-		cap5.read(fiveFrame);
-		//cap6.read(sixFrame);
 
-#ifdef ForceColorPixels	
-		cv::circle(baseFrame, cv::Point(frameWidth / 2, frameHeight / 2), 5, cv::Scalar(0, 255, 0), 2);
-		cv::circle(rightFrame, cv::Point(frameWidth / 2, frameHeight / 2), 5, cv::Scalar(0, 255, 0), 2);
-		cv::circle(leftFrame, cv::Point(frameWidth / 2, frameHeight / 2), 5, cv::Scalar(0, 255, 0), 2);
-		cv::circle(fourFrame, cv::Point(frameWidth / 2, frameHeight / 2), 5, cv::Scalar(0, 255, 0), 2);
-		cv::circle(fiveFrame, cv::Point(frameWidth / 2, frameHeight / 2), 5, cv::Scalar(0, 255, 0), 2);
-#endif
-
+		CO->CO_captureFrames(FRAMES);
 		//imshow("base Frame", baseFrame);
-		if (useGrayScale) {
-			cvtColor(rightFrame, rightFrame, CV_RGB2GRAY);
-			cvtColor(baseFrame, baseFrame, CV_RGB2GRAY);
-			//imshow("test Frame", baseFrame);
-			cvtColor(leftFrame, leftFrame, CV_RGB2GRAY);
-			cvtColor(fourFrame, fourFrame, CV_RGB2GRAY);
-			cvtColor(fiveFrame, fiveFrame, CV_RGB2GRAY);
-			//cvtColor(sixFrame, sixFrame, CV_RGB2GRAY);
-		}
-		else {
-			cv::Mat rrr;
-			cvtColor(rightFrame, rrr, CV_RGB2BGR);
-			rightFrame = rrr.clone();
-			cvtColor(baseFrame, rrr, CV_RGB2BGR);
-			baseFrame == rrr.clone();
-			//imshow("test Frame", baseFrame);
-			cvtColor(leftFrame, rrr, CV_RGB2BGR);
-			leftFrame = rrr.clone();
-			cvtColor(fourFrame, rrr, CV_RGB2BGR);
-			fourFrame = rrr.clone();
-			cvtColor(fiveFrame, rrr, CV_RGB2BGR);
-			fiveFrame = rrr.clone();
-
-		}
-
-		resize(leftFrame, leftFrame, cv::Size(frameWidth, frameHeight));
-		resize(baseFrame, baseFrame, cv::Size(frameWidth, frameHeight));
-		resize(rightFrame, rightFrame, cv::Size(frameWidth, frameHeight));
-		resize(fourFrame, fourFrame, cv::Size(frameWidth, frameHeight));
-		resize(fiveFrame, fiveFrame, cv::Size(frameWidth, frameHeight));
-		//resize(sixFrame, sixFrame, cv::Size(frameWidth, frameHeight));
-		cv::transpose(baseFrame, baseFrame);
-		cv::transpose(rightFrame, rightFrame);
-		cv::transpose(leftFrame, leftFrame);
-		cv::transpose(fourFrame, fourFrame);
-		cv::transpose(fiveFrame, fiveFrame);
-		//cv::transpose(sixFrame, sixFrame);
-		cv::flip(baseFrame, baseFrame, 1);
-		cv::flip(rightFrame, rightFrame, 1);
-		cv::flip(leftFrame, leftFrame, 1);
-		cv::flip(fourFrame, fourFrame, 1);
-		cv::flip(fiveFrame, fiveFrame, 1);
-		//cv::flip(sixFrame, sixFrame, 1);
-		undistort(leftFrame, undistortedLeftFrame, leftIntrinsic, leftDistCoeffs);
-		undistort(baseFrame, undistortedBaseFrame, baseIntrinsic, baseDistCoeffs);
-		undistort(rightFrame, undistortedRightFrame, rightIntrinsic, rightDistCoeffs);
-		undistort(fourFrame, undistortedFourFrame, fourIntrinsic, fourDistCoeffs);
-		undistort(fiveFrame, undistortedFiveFrame, fiveIntrinsic, fiveDistCoeffs);
-		//undistort(sixFrame, undistortedSixFrame, sixIntrinsic, sixDistCoeffs);
-
-		cv::Mat rectLinearBaseFrame = rectlinearProject(undistortedBaseFrame, 0, CAM_F_MAP[BASE_CAM]);
-		cv::Mat rectLinearRightFrame = rectlinearProject(undistortedRightFrame, 0, CAM_F_MAP[RIGHT_CAM]);
-		cv::Mat rectLinearLeftFrame = rectlinearProject(undistortedLeftFrame, 0, CAM_F_MAP[LEFT_CAM]);
-		cv::Mat rectLinearFourFrame = rectlinearProject(undistortedFourFrame, 0, CAM_F_MAP[FOUR_CAM]);
-		cv::Mat rectLinearFiveFrame = rectlinearProject(undistortedFiveFrame, 0, CAM_F_MAP[FIFTH_CAM]);
-		//cv::Mat rectLinearSixFrame = rectlinearProject(undistortedSixFrame, 0, CAM_F_MAP[BACK_CAM]);
-
-		baseFrame = rectLinearBaseFrame;
-		leftFrame = rectLinearLeftFrame;
-		rightFrame = rectLinearRightFrame;
-		fourFrame = rectLinearFourFrame;
-		fiveFrame = rectLinearFiveFrame;
-#ifdef DEBUG_IMAGES
-		cv::imshow("0", baseFrame);
-		cv::imshow("1", leftFrame);
-		cv::imshow("2", rightFrame);
-		cv::imshow("3", fourFrame);
-		cv::imshow("4", fiveFrame);
-		cv::waitKey(0);
-#endif
-
-
-
-
-#ifdef DEBUG_INFO
-		cv::imshow("OUTFIVEFRAMEafter upload", fourFrame);
-#endif
-		//sixFrame = rectLinearSixFrame;
-
-		//Upload back to GPU
-
-		streamB.enqueueUpload(baseFrame, imageBSrc);
-		streamB.waitForCompletion();
-#ifdef DEBUG_IMAGES
-		cv::imshow("fourFrame before", fourFrame);
-		cv::waitKey(10);
-#endif
-		stream4.enqueueUpload(fourFrame, image4Src);
-		stream4.waitForCompletion();
-
-		
-
-		stream5.enqueueUpload(fiveFrame, image5Src);
-		stream5.waitForCompletion();
-		
-		
-
-		streamL.enqueueUpload(leftFrame, imageLSrc);
-		streamL.waitForCompletion();
-		streamR.enqueueUpload(rightFrame, imageRSrc);
-		streamR.waitForCompletion();
-
-#ifdef DEBUG_IMAGES
-		/*stream5.enqueueDownload(result5, outFiveFrame);
-		stream5.waitForCompletion();
-		streamL.enqueueDownload(resultL, outLeftFrame);
-		streamL.waitForCompletion();
-		streamR.enqueueDownload(resultR, outRightFrame);
-		streamR.waitForCompletion();
-		streamB.enqueueDownload(resultB, outBaseFrame);
-		streamB.waitForCompletion();
-		stream4.enqueueDownload(result4, outFourFrame);
-		stream4.waitForCompletion();*/
-#endif
-
-		//stream6.enqueueUpload(sixFrame, image6Src);
-
-		/*
-		//Warp Perspective
-		gpu::warpPerspective(imageBSrc, resultB, trans, cv::Size(resultHeight + 600, resultWidth), cv::INTER_NEAREST | CV_WARP_FILL_OUTLIERS, streamB);
-		gpu::warpPerspective(imageRSrc, resultR, HR, cv::Size(resultHeight + 600, resultWidth), cv::INTER_NEAREST | CV_WARP_FILL_OUTLIERS, streamR);
-		gpu::warpPerspective(imageLSrc, resultL, HL, cv::Size(resultHeight + 600, resultWidth), cv::INTER_NEAREST | CV_WARP_FILL_OUTLIERS, streamL);
-		gpu::warpPerspective(image4Src, result4, H4, cv::Size(resultHeight + 600, resultWidth), cv::INTER_NEAREST | CV_WARP_FILL_OUTLIERS, stream4);
-		gpu::warpPerspective(image5Src, result5, H5, cv::Size(resultHeight + 600, resultWidth), cv::INTER_NEAREST | CV_WARP_FILL_OUTLIERS, stream5);
-		//gpu::warpPerspective(image6Src, result6, H6, cv::Size(resultHeight + 600, resultWidth), cv::INTER_NEAREST | CV_WARP_FILL_OUTLIERS);
-		*/
-		std::cout << H4 << std::endl;
-		gpu::warpPerspective(image4Src, result4, H4, cv::Size(resultHeight + 600, resultWidth), 1, 0, cv::Scalar(), stream4);
-		stream4.waitForCompletion();
-
-#ifdef TEST_FAIL
-		cv::Mat testFrameresult4(result4.size(), result4.type());
-		cv::Mat testImage4Src(image4Src.size(), image4Src.type());
-		stream4.enqueueDownload(result4, testFrameresult4);
-		stream4.waitForCompletion();
-
-		cv::imshow("fourFrame after", testFrameresult4);
-		cv::waitKey(10);
-#endif
-
-		gpu::warpPerspective(imageRSrc, resultR, HR, cv::Size(resultHeight + 600, resultWidth), 1, 0, cv::Scalar(), streamR);
-		streamR.waitForCompletion();
-		gpu::warpPerspective(imageLSrc, resultL, HL, cv::Size(resultHeight + 600, resultWidth), 1, 0, cv::Scalar(), streamL);
-		streamL.waitForCompletion();
-
-		//gpu::resize(image4Src, result4, cv::Size(resultHeight + 600, resultWidth));
-		gpu::warpPerspective(image5Src, result5, H5, cv::Size(resultHeight + 600, resultWidth), 1, 0, cv::Scalar(), stream5);
-		stream5.waitForCompletion();
-
-	
-		gpu::warpPerspective(imageBSrc, resultB, trans, cv::Size(resultHeight + 600, resultWidth), 1, 0, cv::Scalar(), streamB);
-		streamB.waitForCompletion();
-		
-		/*
-		gpu::absdiff(result5, resultL, result5, stream5);
-		gpu::absdiff(result5, resultB, result5, stream5);
-		gpu::absdiff(result5, resultR, result5, stream5);
-		gpu::absdiff(result5, result4, result5, stream5);
-		*/
-		stream5.enqueueDownload(result5, outFiveFrame);
-		stream5.waitForCompletion();
-		streamL.enqueueDownload(resultL, outLeftFrame);
-		streamL.waitForCompletion();
-		streamR.enqueueDownload(resultR, outRightFrame);
-		streamR.waitForCompletion();
-		streamB.enqueueDownload(resultB, outBaseFrame);
-		streamB.waitForCompletion();
-		stream4.enqueueDownload(result4, outFourFrame);
-
-		stream4.waitForCompletion();
-		
-		
-		
-
-		
-		//cv::imshow("OUTFIVEFRAMEafter download", outFourFrame);
-#ifdef DEBUG_INFO
-		cv::imshow("OUTBafter download", outFiveFrame);
-		cv::waitKey(0);
-#endif
-		//stream6.enqueueDownload(result6, outSixFrame);
-
+		IO->IO_cvtColor(FRAMES, CV_RGB2GRAY);
+		IO->IO_resize(FRAMES, cv::Size(frameWidth, frameHeight));
+		IO->IO_transpose(FRAMES);
+		IO->IO_flip(FRAMES, 1);
+		IO->IO_undistort(FRAMES, INTRINSICCOEFFS, DISTORTIONCOEFFS);
+		IO->IO_rectilinearProject(FRAMES, 0, FOCAL);
+		GO->GO_uploadStream(FRAMES);
+		GO->GO_perspectiveTransform(EXTRINSICCOEFFS, resultHeight + 600, resultWidth);
+		GO->GO_downloadStream(RESULTS);
 
 		if (!useGrayScale) {
 
-#ifdef DEBUG_IMAGES
-			cv::imshow("1", outFiveFrame);
-			cv::imshow("2", outLeftFrame);
-			cv::imshow("3", outRightFrame);
-			cv::imshow("4", outBaseFrame);
-			cv::imshow("5", outFourFrame);
-			cv::waitKey(10);
-#endif
 			/// JH: Added RGB support using cv::Vec3b when grayScale option is disabled
 			for (int j = 0; j < result.rows; ++j)
 				for (int i = 0; i < result.cols; ++i)
@@ -1023,15 +796,7 @@ int stitchLive()
 			for (int j = 0; j < result.rows; ++j)
 				for (int i = 0; i < result.cols; ++i)
 				{
-					//cout << "blending" << endl;
-					/**
-					cv::Vec3b cL(0, 0, 0);
-					cv::Vec3b cB(0, 0, 0);
-					cv::Vec3b cR(0, 0, 0);
-					cv::Vec3b cLB(0, 0, 0);
-					cv::Vec3b cBR(0, 0, 0);
-					cv::Vec3b color(0, 0, 0);
-					*/
+					
 					float blendA = 0.8;
 					uchar cL;
 					uchar cB;
@@ -1068,24 +833,24 @@ int stitchLive()
 					*/
 					if (j < result.rows && i < fifthLimit){
 						c5_0 = true;
-						c5 = outFiveFrame.at<uchar>(j, i);
+						c5 = RESULTS[4].at<uchar>(j, i);
 					}
 					if (j < result.rows && i < leftLimit && i > fifthLimit){
 						cL_0 = true;
-						cL = outLeftFrame.at<uchar>(j, i);
+						cL = RESULTS[1].at<uchar>(j, i);
 					}
-					if (j < baseFrame.rows && i>baseLeftLimit && i < baseRightLimit) {
+					if (j < result.rows && i > baseLeftLimit && i < baseRightLimit) {
 						//cout << "cB is true" << endl;
 						cB_0 = true;
-						cB = outBaseFrame.at<uchar>(j, i);
+						cB = RESULTS[0].at<uchar>(j, i);
 					}
 					if (j < result.rows && i>rightLimit && i < fourLimit) {
 						cR_0 = true;
-						cR = outRightFrame.at<uchar>(j, i);
+						cR = RESULTS[2].at<uchar>(j, i);
 					}
 					if (j < result.rows && i> fourLimit) {
 						c4_0 = true;
-						c4 = outFourFrame.at<uchar>(j, i);
+						c4 = RESULTS[3].at<uchar>(j, i);
 					}
 
 
@@ -1159,12 +924,6 @@ int stitchLive()
 
 		croppedImage = result(Rect(topLeft.x, topLeft.y, croppedWidth, croppedHeight));
 
-		//cv::imshow("left", outLeftFrame);
-		//cv::imshow("right", outRightFrame);
-		//cv::imshow("base", outBaseFrame);
-		//cv::imshow("four", outFourFrame);
-		//cv::imshow("five", outFiveFrame);
-		//cv::imshow("Result", result);
 		if (croppedImage.channels() == 3) {
 			cv::cvtColor(croppedImage, croppedImage, CV_RGB2BGR);
 		}
@@ -1192,23 +951,13 @@ int stitchLive()
 		if (waitKey(30) == 27)
 			break;
 	}
-
-
-}
-
-
-int use360Camera()
-{
-	if (record() == 1)
-		stitch();
-
 	return 1;
 
+
 }
 
-int testingFunction() {
-	
-	cout << "Stitching... \n" << endl;
+int stitchLiveWOGPU() {
+	cout << "Stitching without GPU... \n" << endl;
 
 	std::vector<int> cameraPorts(NO_OF_CAMS);
 	cameraPorts[0] = BASE_CAM;
@@ -1217,8 +966,7 @@ int testingFunction() {
 	cameraPorts[3] = FOUR_CAM;
 	cameraPorts[4] = FIFTH_CAM;
 	CameraOps *CO = new CameraOps(cameraPorts);
-	cv::VideoCapture capL(LEFT_CAM), capB(BASE_CAM), capR(RIGHT_CAM), cap4(FOUR_CAM), cap5(FIFTH_CAM), cap6(BACK_CAM);
-	
+
 	cv::VideoWriter outputVideo;
 	cv::Mat result, leftFrame, baseFrame, rightFrame, fourFrame, fiveFrame, sixFrame;
 	cv::Mat undistortedLeftFrame, undistortedBaseFrame, undistortedRightFrame, undistortedFourFrame, undistortedFiveFrame, undistortedSixFrame;
@@ -1235,7 +983,7 @@ int testingFunction() {
 	double Saturation;
 	double Gain;
 
-	Brightness = CO->CO_getProp(CV_CAP_PROP_BRIGHTNESS, 0); 
+	Brightness = CO->CO_getProp(CV_CAP_PROP_BRIGHTNESS, 0);
 	Contrast = CO->CO_getProp(CV_CAP_PROP_CONTRAST, 0);
 	Saturation = CO->CO_getProp(CV_CAP_PROP_SATURATION, 0);
 	Gain = CO->CO_getProp(CV_CAP_PROP_GAIN, 0);
@@ -1250,8 +998,8 @@ int testingFunction() {
 	CO->CO_setProp(CV_CAP_PROP_SATURATION, Saturation);
 	CO->CO_setProp(CV_CAP_PROP_GAIN, Gain);
 
-	int frameWidth = capL.get(CV_CAP_PROP_FRAME_WIDTH)*0.25;
-	int frameHeight = capL.get(CV_CAP_PROP_FRAME_HEIGHT)*0.25;
+	int frameWidth = CO->CO_getProp(CV_CAP_PROP_FRAME_WIDTH,0)*0.25;
+	int frameHeight = CO->CO_getProp(CV_CAP_PROP_FRAME_HEIGHT, 0)*0.25;
 	int resultWidth = frameHeight * 2;
 	int resultHeight = frameWidth + 100;
 	bool record = false;
@@ -1260,11 +1008,10 @@ int testingFunction() {
 	RESULTS[2] = resultR = cv::Mat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
 	RESULTS[3] = result4 = cv::Mat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
 	RESULTS[4] = result5 = cv::Mat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	
+
 	result = Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
 
 	ImageOps *IO = new ImageOps();
-
 
 	// Move Scene to the right by 100
 	int x_offset = 500;
@@ -1290,12 +1037,12 @@ int testingFunction() {
 		cout << "Error reading file " << endl;
 		return -1;
 	}
-	
+
 	IO->IO_resize(FRAMES, cv::Size(frameWidth, frameHeight));
 	IO->IO_transpose(FRAMES);
 	IO->IO_flip(FRAMES, 1);
 	IO->IO_undistort(FRAMES, INTRINSICCOEFFS, DISTORTIONCOEFFS);
-	
+
 	//MOVE TO PREPROCESSING
 	scene_corners.clear();
 	scene_cornersLeft.push_back(Point2f(0.0, 0.0));
@@ -1318,7 +1065,7 @@ int testingFunction() {
 	scene_cornersFive.push_back(Point2f(FRAMES[4].cols, 0.0));
 	scene_cornersFive.push_back(Point2f(0.0, FRAMES[4].rows));
 	scene_cornersFive.push_back(Point2f(FRAMES[4].cols, FRAMES[4].rows));
-	
+
 	//MOVE TO PREPROCESSING
 	perspectiveTransform(scene_cornersBase, scene_cornersBase, trans);
 	perspectiveTransform(scene_cornersLeft, scene_cornersLeft, HL);
@@ -1385,10 +1132,10 @@ int testingFunction() {
 	float _totalSPF = 0;
 
 	//Get GPU ready
-	cv::gpu::setDevice(0);
-	cv::Mat tmp;
-	capL.read(tmp);
-	cv::gpu::GpuMat templ_d(tmp); // Warm up the cores
+	//cv::gpu::setDevice(0);
+	//cv::Mat tmp;
+	
+	//cv::gpu::GpuMat templ_d(tmp); // Warm up the cores
 
 	//Initialize needed variables for GPU
 	cv::gpu::GpuMat imageBSrc, imageBDst, imageRSrc, imageRDst, imageLSrc, image4Src, image4Dst, image5Src, image5Dst, imageLDst, image6Dst, image6Src;
@@ -1400,12 +1147,6 @@ int testingFunction() {
 	outFiveFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
 	outSixFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
 
-	cv::Mat middlewareLeftFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	cv::Mat middlewareRightFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	cv::Mat middlewareBaseFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	cv::Mat middlewareFourFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	cv::Mat middlewareFiveFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	cv::Mat middlewareSixFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
 	cv::gpu::Stream streamL, streamR, streamB, stream4, stream5, stream6;
 
 	//Start processing
@@ -1413,10 +1154,10 @@ int testingFunction() {
 	{
 		frameNo++;
 		int _startWhileLoop = (int)getTickCount();
-		
+
 		CO->CO_captureFrames(FRAMES);
 		//imshow("base Frame", baseFrame);
-		if (useGrayScale) {	
+		if (useGrayScale) {
 			IO->IO_cvtColor(FRAMES, CV_RGB2GRAY);
 		}
 		else {
@@ -1736,7 +1477,6 @@ int testingFunction() {
 		if (waitKey(30) == 27)
 			break;
 	}
-
 }
 
 int recordSimple() {
