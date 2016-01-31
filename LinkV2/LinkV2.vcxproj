@@ -152,12 +152,14 @@
     <ClCompile Include="CameraOps.cpp" />
     <ClCompile Include="GPUOps.cpp" />
     <ClCompile Include="ImageOps.cpp" />
+    <ClCompile Include="MemoryManager.cpp" />
     <ClCompile Include="Source.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CameraOps.h" />
     <ClInclude Include="GPUOps.h" />
     <ClInclude Include="ImageOps.h" />
+    <ClInclude Include="MemoryManager.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

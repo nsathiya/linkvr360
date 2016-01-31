@@ -20,6 +20,7 @@
 #include "ImageOps.h"
 #include "CameraOps.h"
 #include "GPUOps.h"
+#include "MemoryManager.h"
 
 using namespace std;
 using namespace cv;
@@ -32,15 +33,16 @@ const int FIFTH_CAM = 3; // 2; // 3; // 2; // 3;
 const int BACK_CAM = 5;
 const int NO_OF_CAMS = 5;
 
-string videoPath = "videos";
+string videoPath = "samples";
+string preprocess = videoPath + "/preprocess";
 string calibrationPath = "calibration";
 string internalCalibrationPath = calibrationPath + "/internal";
 string externalCalibrationPath = calibrationPath + "/external";
-string camLOutput = videoPath + "/Cam_L_Stream.avi";
-string camROutput = videoPath + "/Cam_R_Stream.avi";
-string camBOutput = videoPath + "/Cam_B_Stream.avi";
-string cam4Output = videoPath + "/Cam_4_Stream.avi";
-string cam5Output = videoPath + "/Cam_5_Stream.avi";
+string camLOutput = preprocess + "/Cam_L_Stream.avi";
+string camROutput = preprocess + "/Cam_R_Stream.avi";
+string camBOutput = preprocess + "/Cam_B_Stream.avi";
+string cam4Output = preprocess + "/Cam_4_Stream.avi";
+string cam5Output = preprocess + "/Cam_5_Stream.avi";
 string camResultOutput = videoPath + "/Cam_Result_Stream.avi";
 
 // Distortion
@@ -70,11 +72,9 @@ void setup();
 int showFrames();
 int stitch();
 int record();
-int stitchLive();
+int stitchLive(bool GPU);
 int stitchLiveWOGPU();
-int stitchLiveWGPU();
 int use360Camera();
-int recordSimple();
 int testingFunction();
 
 cv::Point2f convert_pt(cv::Point2f point, int w, int h, int INV_FLAG, float F);
@@ -86,6 +86,7 @@ std::vector<cv::Mat> INTRINSICCOEFFS(NO_OF_CAMS);
 std::vector<cv::Mat> EXTRINSICCOEFFS(NO_OF_CAMS);
 std::vector<cv::Mat> DISTORTIONCOEFFS(NO_OF_CAMS);
 std::vector<cv::Mat> RESULTS(NO_OF_CAMS);
+std::vector<std::string> PREPROCESS_FRAMES_PATH(NO_OF_CAMS);
 std::vector<float> FOCAL(NO_OF_CAMS);
 
 int main() {
@@ -94,9 +95,7 @@ int main() {
 	setup();
 
 	std::string MainMenu = "Welcome to Link's imaging module.\n"
-		"Press 's' to Sitch Live.\n"
 		"Press 'r' to Record and Stitch. \n"
-		"Press 'e' to Record Only. \n"
 		"Press 'f' to Show Test Frames.\n"
 		"Press 'c' for External Calibration.\n"
 		"Press 'i' for Internal Calibration.\n"
@@ -111,29 +110,19 @@ int main() {
 		char optionSelected;
 		std::cin >> optionSelected;
 
-		if (optionSelected == 's')
-		{
-			if (stitchLive() == 1)
-				return 0;
-		}
 		if (optionSelected == 'a')
 		{
-			if (stitchLiveWOGPU() == 1)
+			if (stitchLive(false) == 1)
 				return 0;
 		}
 		if (optionSelected == 'b')
 		{
-			if (stitchLiveWGPU() == 1)
+			if (stitchLive(true) == 1)
 				return 0;
 		}
 		if (optionSelected == 'r')
 		{
 			if (use360Camera() == 1)
-				return 0;
-		}
-		if (optionSelected == 'e')
-		{
-			if (recordSimple() == 1)
 				return 0;
 		}
 		if (optionSelected == 'f')
@@ -252,6 +241,12 @@ void setup()
 	EXTRINSICCOEFFS[2] = HR;
 	EXTRINSICCOEFFS[3] = H4;
 	EXTRINSICCOEFFS[4] = H5;
+
+	PREPROCESS_FRAMES_PATH[0] = camBOutput;
+	PREPROCESS_FRAMES_PATH[0] = camLOutput;
+	PREPROCESS_FRAMES_PATH[0] = camROutput;
+	PREPROCESS_FRAMES_PATH[0] = cam4Output;
+	PREPROCESS_FRAMES_PATH[0] = cam5Output;
 
 }
 
@@ -430,17 +425,10 @@ cv::Point2f convert_pt(cv::Point2f point, int w, int h, int INV_FLAG, float F)
 }
 
 
-int stitchLive()
-{
-
-	return 1;
-}
-
-
 int use360Camera()
 {
 	if (record() == 1)
-		stitch();
+		//stitch();
 
 	return 1;
 
@@ -451,9 +439,13 @@ int testingFunction() {
 	return 1;
 }
 
-int stitchLiveWGPU() {
+int stitchLive(bool GPU) {
 
-	cout << "Stitching with GPU... \n" << endl;
+	std::string method = "w/o GPU";
+	if (GPU)
+		method = "w GPU";
+
+	cout << "Stitching " + method << endl;
 
 	std::vector<int> cameraPorts(NO_OF_CAMS);
 	cameraPorts[0] = BASE_CAM;
@@ -463,10 +455,8 @@ int stitchLiveWGPU() {
 	cameraPorts[4] = FIFTH_CAM;
 	CameraOps *CO = new CameraOps(cameraPorts);
 	ImageOps *IO = new ImageOps();
-	GPUOps *GO = new GPUOps(NO_OF_CAMS);
-
+	GPUOps *GO = GPU ? new GPUOps(NO_OF_CAMS) : NULL;
 	cv::VideoWriter outputVideo;
-	cv::Mat result;
 
 	std::vector<cv::Point2f> scene_cornersLeft, scene_cornersRight, scene_cornersBase, scene_cornersFour, scene_cornersFive, scene_cornersSix, scene_corners;
 	CO->CO_setProp(CV_CAP_PROP_FRAME_WIDTH, 1920);
@@ -497,7 +487,7 @@ int stitchLiveWGPU() {
 	int resultWidth = frameHeight * 2;
 	int resultHeight = frameWidth + 100;
 	bool record = false;
-	result = Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
+	cv::Mat result = Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
 
 	// Move Scene to the right by 100
 	int x_offset = 500;
@@ -619,23 +609,13 @@ int stitchLiveWGPU() {
 	int frameNo = 0;
 	float _totalSPF = 0;
 
-	//Get GPU ready
-	//cv::gpu::setDevice(0);
-	//cv::Mat tmp(FRAMES[0]);
-	//capL.read(tmp);
-	//tmp = FRAMES[0];
-	//cv::gpu::GpuMat templ_d(tmp); // Warm up the cores
-
 	//Initialize needed variables for GPU
-	cv::Mat outLeftFrame, outRightFrame, outBaseFrame, outFourFrame, outFiveFrame, outSixFrame;
-	RESULTS[0] = outLeftFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
-	RESULTS[1] = outRightFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
-	RESULTS[2] = outBaseFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
-	RESULTS[3] = outFourFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
-	RESULTS[4] = outFiveFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
+	RESULTS[0] = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
+	RESULTS[1] = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
+	RESULTS[2] = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
+	RESULTS[3] = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
+	RESULTS[4] = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
 	//outSixFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
-
-	cv::gpu::Stream streamL, streamR, streamB, stream4, stream5, stream6;
 
 	//Start processing
 	while (1)
@@ -651,10 +631,16 @@ int stitchLiveWGPU() {
 		IO->IO_flip(FRAMES, 1);
 		IO->IO_undistort(FRAMES, INTRINSICCOEFFS, DISTORTIONCOEFFS);
 		IO->IO_rectilinearProject(FRAMES, 0, FOCAL);
-		GO->GO_uploadStream(FRAMES);
-		GO->GO_perspectiveTransform(EXTRINSICCOEFFS, resultHeight + 600, resultWidth);
-		GO->GO_downloadStream(RESULTS);
-
+		if (GPU){
+			GO->GO_uploadStream(FRAMES);
+			GO->GO_perspectiveTransform(EXTRINSICCOEFFS, resultHeight + 600, resultWidth);
+			GO->GO_downloadStream(RESULTS);
+		}
+		else {
+			IO->IO_warpPerspective(FRAMES, RESULTS, EXTRINSICCOEFFS, cv::Size(resultHeight + 600, resultWidth));
+		}
+		
+		
 		if (!useGrayScale) {
 
 			/// JH: Added RGB support using cv::Vec3b when grayScale option is disabled
@@ -706,24 +692,24 @@ int stitchLiveWGPU() {
 					*/
 					if (j < result.rows && i < fifthLimit){
 						c5_0 = true;
-						c5 = outFiveFrame.at<cv::Vec3b>(j, i);
+						c5 = RESULTS[4].at<cv::Vec3b>(j, i);
 					}
 					if (j < result.rows && i < leftLimit && i > fifthLimit){
 						cL_0 = true;
-						cL = outLeftFrame.at<cv::Vec3b>(j, i);
+						cL = RESULTS[1].at<cv::Vec3b>(j, i);
 					}
 					if (j < baseFrame.rows && i>baseLeftLimit && i < baseRightLimit) {
 						//cout << "cB is true" << endl;
 						cB_0 = true;
-						cB = outBaseFrame.at<cv::Vec3b>(j, i);
+						cB = RESULTS[0].at<cv::Vec3b>(j, i);
 					}
 					if (j < result.rows && i>rightLimit && i < fourLimit) {
 						cR_0 = true;
-						cR = outRightFrame.at<cv::Vec3b>(j, i);
+						cR = RESULTS[2].at<cv::Vec3b>(j, i);
 					}
 					if (j < result.rows && i> fourLimit) {
 						c4_0 = true;
-						c4 = outFourFrame.at<cv::Vec3b>(j, i);
+						c4 = RESULTS[3].at<cv::Vec3b>(j, i);
 					}
 
 
@@ -956,639 +942,6 @@ int stitchLiveWGPU() {
 
 }
 
-int stitchLiveWOGPU() {
-	cout << "Stitching without GPU... \n" << endl;
-
-	std::vector<int> cameraPorts(NO_OF_CAMS);
-	cameraPorts[0] = BASE_CAM;
-	cameraPorts[1] = LEFT_CAM;
-	cameraPorts[2] = RIGHT_CAM;
-	cameraPorts[3] = FOUR_CAM;
-	cameraPorts[4] = FIFTH_CAM;
-	CameraOps *CO = new CameraOps(cameraPorts);
-
-	cv::VideoWriter outputVideo;
-	cv::Mat result, leftFrame, baseFrame, rightFrame, fourFrame, fiveFrame, sixFrame;
-	cv::Mat undistortedLeftFrame, undistortedBaseFrame, undistortedRightFrame, undistortedFourFrame, undistortedFiveFrame, undistortedSixFrame;
-
-	//gpu::GpuMat resultL, resultB, resultR, resultMask, result4, result5, result6;
-	cv::Mat resultL, resultB, resultR, resultMask, result4, result5, result6;
-
-	std::vector<cv::Point2f> scene_cornersLeft, scene_cornersRight, scene_cornersBase, scene_cornersFour, scene_cornersFive, scene_cornersSix, scene_corners;
-	CO->CO_setProp(CV_CAP_PROP_FRAME_WIDTH, 1920);
-	CO->CO_setProp(CV_CAP_PROP_FRAME_HEIGHT, 1080);
-
-	double Brightness;
-	double Contrast;
-	double Saturation;
-	double Gain;
-
-	Brightness = CO->CO_getProp(CV_CAP_PROP_BRIGHTNESS, 0);
-	Contrast = CO->CO_getProp(CV_CAP_PROP_CONTRAST, 0);
-	Saturation = CO->CO_getProp(CV_CAP_PROP_SATURATION, 0);
-	Gain = CO->CO_getProp(CV_CAP_PROP_GAIN, 0);
-
-	cout << "Brightness: " << Brightness;
-	cout << "Contrast: " << Contrast;
-	cout << "Saturation: " << Saturation;
-	cout << "Gain: " << Gain;
-
-	CO->CO_setProp(CV_CAP_PROP_BRIGHTNESS, Brightness);
-	CO->CO_setProp(CV_CAP_PROP_CONTRAST, Contrast);
-	CO->CO_setProp(CV_CAP_PROP_SATURATION, Saturation);
-	CO->CO_setProp(CV_CAP_PROP_GAIN, Gain);
-
-	int frameWidth = CO->CO_getProp(CV_CAP_PROP_FRAME_WIDTH,0)*0.25;
-	int frameHeight = CO->CO_getProp(CV_CAP_PROP_FRAME_HEIGHT, 0)*0.25;
-	int resultWidth = frameHeight * 2;
-	int resultHeight = frameWidth + 100;
-	bool record = false;
-	RESULTS[0] = resultB = cv::Mat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	RESULTS[1] = resultL = cv::Mat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	RESULTS[2] = resultR = cv::Mat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	RESULTS[3] = result4 = cv::Mat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-	RESULTS[4] = result5 = cv::Mat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-
-	result = Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
-
-	ImageOps *IO = new ImageOps();
-
-	// Move Scene to the right by 100
-	int x_offset = 500;
-	float y_offset = 0.0;
-	float z_offset = 100.0;
-	float transdata[] = { 1.0, 0.0, x_offset, 0.0, 1.0, y_offset, 0.0, 0.0, 1.0 };
-	cv::Mat trans(3, 3, CV_32FC1, transdata);
-	EXTRINSICCOEFFS[0] = trans;
-
-	Mat HR_m = HR.clone();
-	Mat HL_m = HL.clone();
-	HR = trans * HR;
-	HL = trans * HL;
-	H4 = trans * HR_m * H4;
-	H5 = trans * HL_m * H5;
-	//H6 = trans * HL_m * H5 * H6;
-
-	cout << "finished getting matrix" << endl;
-
-	CO->CO_captureFrames(FRAMES);
-
-	if (FRAMES[0].cols == 0) {
-		cout << "Error reading file " << endl;
-		return -1;
-	}
-
-	IO->IO_resize(FRAMES, cv::Size(frameWidth, frameHeight));
-	IO->IO_transpose(FRAMES);
-	IO->IO_flip(FRAMES, 1);
-	IO->IO_undistort(FRAMES, INTRINSICCOEFFS, DISTORTIONCOEFFS);
-
-	//MOVE TO PREPROCESSING
-	scene_corners.clear();
-	scene_cornersLeft.push_back(Point2f(0.0, 0.0));
-	scene_cornersLeft.push_back(Point2f(FRAMES[1].cols, 0.0));
-	scene_cornersLeft.push_back(Point2f(0.0, FRAMES[1].rows));
-	scene_cornersLeft.push_back(Point2f(FRAMES[1].cols, FRAMES[1].rows));
-	scene_cornersRight.push_back(Point2f(0.0, 0.0));
-	scene_cornersRight.push_back(Point2f(FRAMES[2].cols, 0.0));
-	scene_cornersRight.push_back(Point2f(0.0, FRAMES[2].rows));
-	scene_cornersRight.push_back(Point2f(FRAMES[2].cols, FRAMES[2].rows));
-	scene_cornersBase.push_back(Point2f(0.0, 0.0));
-	scene_cornersBase.push_back(Point2f(FRAMES[0].cols, 0.0));
-	scene_cornersBase.push_back(Point2f(0.0, FRAMES[0].rows));
-	scene_cornersBase.push_back(Point2f(FRAMES[0].cols, FRAMES[0].rows));
-	scene_cornersFour.push_back(Point2f(0.0, 0.0));
-	scene_cornersFour.push_back(Point2f(FRAMES[3].cols, 0.0));
-	scene_cornersFour.push_back(Point2f(0.0, FRAMES[3].rows));
-	scene_cornersFour.push_back(Point2f(FRAMES[3].cols, FRAMES[3].rows));
-	scene_cornersFive.push_back(Point2f(0.0, 0.0));
-	scene_cornersFive.push_back(Point2f(FRAMES[4].cols, 0.0));
-	scene_cornersFive.push_back(Point2f(0.0, FRAMES[4].rows));
-	scene_cornersFive.push_back(Point2f(FRAMES[4].cols, FRAMES[4].rows));
-
-	//MOVE TO PREPROCESSING
-	perspectiveTransform(scene_cornersBase, scene_cornersBase, trans);
-	perspectiveTransform(scene_cornersLeft, scene_cornersLeft, HL);
-	perspectiveTransform(scene_cornersRight, scene_cornersRight, HR);
-	perspectiveTransform(scene_cornersFour, scene_cornersFour, H4);
-	perspectiveTransform(scene_cornersFive, scene_cornersFive, H5);
-
-	//Store useful information for Image limits
-	int leftLimit, baseLeftLimit, baseRightLimit, rightLimit, fourLimit, fifthLimit, sixLimit;
-
-	//MOVE TO PREPROCESSING
-	fifthLimit = scene_cornersFive[1].x;
-	//sixLimit = scene_cornersSix[1].x;
-	leftLimit = scene_cornersLeft[1].x;
-	baseLeftLimit = x_offset;
-	baseRightLimit = x_offset + FRAMES[0].cols;
-	rightLimit = scene_cornersRight[0].x;
-	fourLimit = scene_cornersFour[0].x;
-	Mat croppedImage;
-
-	//for cropping final result PLEASE REDO
-	//MOVE TO PREPROCESSING
-	cv::Point topLeft, topRight, bottomLeft, bottomRight;
-	int bottomLowerHeight, rightSmallerWidth, croppedWidth, croppedHeight;
-	topLeft.y = scene_cornersFive[0].y;
-	topLeft.x = scene_cornersFive[0].x;
-	topRight.y = scene_cornersFour[1].y;
-	topRight.x = scene_cornersFour[1].x;
-	bottomLeft.y = scene_cornersFive[2].y;
-	bottomLeft.x = scene_cornersFive[2].x;
-	bottomRight.y = scene_cornersFour[3].y;
-	bottomRight.x = scene_cornersFour[3].x;
-
-	//MOVE TO PREPROCESSING
-	if (topLeft.y < 0)
-		topLeft.y = 0;
-	if (topLeft.x < 0)
-		topLeft.x = 0;
-	if (topRight.y < 0)
-		topRight.y = 0;
-	if (topRight.x > result.cols)
-		topRight.x = result.cols;
-	if (bottomRight.y > result.rows)
-		bottomRight.y = result.rows;
-	if (bottomRight.x > result.cols)
-		bottomRight.x = result.cols;
-	if (bottomLeft.y > result.rows)
-		bottomLeft.y = result.rows;
-	if (bottomLeft.x < 0)
-		bottomLeft.x = 0;
-
-	//MOVE TO PREPROCESSING
-	(bottomLeft.y < bottomRight.y) ? bottomLowerHeight = bottomLeft.y : bottomLowerHeight = bottomRight.y;
-	(topRight.x < bottomRight.x) ? rightSmallerWidth = topRight.x : rightSmallerWidth = bottomRight.x;
-	(topLeft.x < bottomLeft.x) ? topLeft.x = bottomLeft.x : topLeft.x = topLeft.x;
-	(topLeft.y < topRight.y) ? topLeft.y = topRight.y : topLeft.y = topLeft.y;
-	croppedWidth = rightSmallerWidth - topLeft.x;
-	croppedHeight = bottomLowerHeight - topLeft.y;
-
-	//Timer Info
-	int _frequency = getTickFrequency();
-	float _secsPerCycle = (float)1 / _frequency;
-	int frameNo = 0;
-	float _totalSPF = 0;
-
-	//Get GPU ready
-	//cv::gpu::setDevice(0);
-	//cv::Mat tmp;
-	
-	//cv::gpu::GpuMat templ_d(tmp); // Warm up the cores
-
-	//Initialize needed variables for GPU
-	cv::gpu::GpuMat imageBSrc, imageBDst, imageRSrc, imageRDst, imageLSrc, image4Src, image4Dst, image5Src, image5Dst, imageLDst, image6Dst, image6Src;
-	cv::Mat outLeftFrame, outRightFrame, outBaseFrame, outFourFrame, outFiveFrame, outSixFrame;
-	outLeftFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
-	outRightFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
-	outBaseFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
-	outFourFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
-	outFiveFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
-	outSixFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
-
-	cv::gpu::Stream streamL, streamR, streamB, stream4, stream5, stream6;
-
-	//Start processing
-	while (1)
-	{
-		frameNo++;
-		int _startWhileLoop = (int)getTickCount();
-
-		CO->CO_captureFrames(FRAMES);
-		//imshow("base Frame", baseFrame);
-		if (useGrayScale) {
-			IO->IO_cvtColor(FRAMES, CV_RGB2GRAY);
-		}
-		else {
-			cv::Mat rrr;
-			cvtColor(rightFrame, rrr, CV_RGB2BGR);
-			rightFrame = rrr.clone();
-			cvtColor(baseFrame, rrr, CV_RGB2BGR);
-			baseFrame == rrr.clone();
-			//imshow("test Frame", baseFrame);
-			cvtColor(leftFrame, rrr, CV_RGB2BGR);
-			leftFrame = rrr.clone();
-			cvtColor(fourFrame, rrr, CV_RGB2BGR);
-			fourFrame = rrr.clone();
-			cvtColor(fiveFrame, rrr, CV_RGB2BGR);
-			fiveFrame = rrr.clone();
-		}
-
-		IO->IO_resize(FRAMES, cv::Size(frameWidth, frameHeight));
-		IO->IO_transpose(FRAMES);
-		IO->IO_flip(FRAMES, 1);
-		IO->IO_undistort(FRAMES, INTRINSICCOEFFS, DISTORTIONCOEFFS);
-		IO->IO_rectilinearProject(FRAMES, 0, FOCAL);
-		IO->IO_warpPerspective(FRAMES, RESULTS, EXTRINSICCOEFFS, cv::Size(resultHeight + 600, resultWidth));
-
-		if (!useGrayScale) {
-
-			/// JH: Added RGB support using cv::Vec3b when grayScale option is disabled
-			for (int j = 0; j < result.rows; ++j)
-				for (int i = 0; i < result.cols; ++i)
-				{
-
-					float blendA = 0.8;
-					cv::Vec3b cL;
-					cv::Vec3b cB;
-					cv::Vec3b cR;
-					cv::Vec3b c4;
-					cv::Vec3b c5;
-					cv::Vec3b c6;
-					cv::Vec3b cLB;
-					cv::Vec3b cBR;
-					cv::Vec3b cR4;
-					cv::Vec3b c5L;
-					cv::Vec3b c65;
-					cv::Vec3b color;
-
-					float coeff = 0.4;
-					int blendValue;
-					bool cL_0 = false;
-					bool cB_0 = false;
-					bool cR_0 = false;
-					bool c4_0 = false;
-					bool c5_0 = false;
-					bool c6_0 = false;
-
-
-					//color = resultB.at<uchar>(j, i) + resultL.at<uchar>(j, i) + resultR.at<uchar>(j, i) + result4.at<uchar>(j, i) + result5.at<uchar>(j, i);
-
-
-					// Assign flags
-					/*
-					if (j < result.rows && i < sixLimit){
-					c6_0 = true;
-					c6 = outSixFrame.at<uchar>(j, i);
-					}
-					*/
-					if (j < result.rows && i < fifthLimit){
-						c5_0 = true;
-						c5 = outFiveFrame.at<cv::Vec3b>(j, i);
-					}
-					if (j < result.rows && i < leftLimit && i > fifthLimit){
-						cL_0 = true;
-						cL = outLeftFrame.at<cv::Vec3b>(j, i);
-					}
-					if (j < result.rows && i>baseLeftLimit && i < baseRightLimit) {
-						cout << "cB is true" << endl;
-						cB_0 = true;
-						cB = outBaseFrame.at<cv::Vec3b>(j, i);
-					}
-					if (j < result.rows && i>rightLimit && i < fourLimit) {
-						cR_0 = true;
-						cR = outRightFrame.at<cv::Vec3b>(j, i);
-					}
-					if (j < result.rows && i> fourLimit) {
-						c4_0 = true;
-						c4 = outFourFrame.at<cv::Vec3b>(j, i);
-					}
-
-
-					// Activate color based on flags
-					if (c5_0 && cL_0 && !cB_0 && !cR_0)
-					{
-						// Use combination of five + left
-						color = ((1 - blendA)*cL + blendA*c5);
-					}
-					else if (!c5_0 && cL_0 && cB_0 && !cR_0)
-					{
-						// Use combination of base + left
-						color = ((1 - blendA)*cL + blendA*cB);
-					}
-					else if (!c5_0 && !cL_0 && cB_0 && cR_0 && !c4_0)
-					{
-						// Use combination of base + right
-						color = ((1 - blendA)*cB + blendA*cR);
-					}
-					else if (!c5_0 && !cL_0 && !cB_0 && cR_0 && c4_0)
-					{
-						// Use combination of four + right
-						color = ((1 - blendA)*cR + blendA*c4);
-					}
-					/*
-					else if (c6_0 && c5_0 && !cL_0 && !cB_0 && !cR_0 && !c4_0)
-					{
-					// Use combination of six + five
-					color = ((1 - blendA)*c5 + blendA*c6);
-					}
-					*/
-					else if (!c6_0 && !c5_0 && !cL_0 && cB_0 && !cR_0 && !c4_0)
-					{
-						// In base's frame
-						color = cB;
-					}
-					else if (!c6_0 && !c5_0 && cL_0 && !cB_0 && !cR_0)
-					{
-						// In left's frame
-						color = cL;
-					}
-
-					else if (!c6_0 && !c5_0 && !cL_0 && !cB_0 && cR_0 && !c4_0)
-					{
-						// In right frame
-						color = cR;
-					}
-					else if (!c6_0 && !c5_0 && !cL_0 && !cB_0 && !cR_0 && c4_0)
-					{
-						// In fourth frame
-						color = c4;
-					}
-					else if (!c6_0 && c5_0 && !cL_0 && !cB_0 && !cR_0 && !c4_0)
-					{
-						// In fifth frame
-						color = c5;
-					}
-					/*
-					else if (c6_0 && !c5_0 && !cL_0 && !cB_0 && !cR_0 && !c4_0)
-					{
-					// In sixth frame
-					color = c6;
-					}
-					*/
-					//result.at<cv::Vec3b>(j, i) = color;
-					result.at<cv::Vec3b>(j, i) = color;
-				}
-		}
-		else {
-			for (int j = 0; j < result.rows; ++j)
-				for (int i = 0; i < result.cols; ++i)
-				{
-					//cout << "blending" << endl;
-					/**
-					cv::Vec3b cL(0, 0, 0);
-					cv::Vec3b cB(0, 0, 0);
-					cv::Vec3b cR(0, 0, 0);
-					cv::Vec3b cLB(0, 0, 0);
-					cv::Vec3b cBR(0, 0, 0);
-					cv::Vec3b color(0, 0, 0);
-					*/
-					float blendA = 0.8;
-					uchar cL;
-					uchar cB;
-					uchar cR;
-					uchar c4;
-					uchar c5;
-					uchar c6;
-					uchar cLB;
-					uchar cBR;
-					uchar cR4;
-					uchar c5L;
-					uchar c65;
-					uchar color;
-
-					float coeff = 0.4;
-					int blendValue;
-					bool cL_0 = false;
-					bool cB_0 = false;
-					bool cR_0 = false;
-					bool c4_0 = false;
-					bool c5_0 = false;
-					bool c6_0 = false;
-
-
-					//color = resultB.at<uchar>(j, i) + resultL.at<uchar>(j, i) + resultR.at<uchar>(j, i) + result4.at<uchar>(j, i) + result5.at<uchar>(j, i);
-
-
-					// Assign flags
-					/*
-					if (j < result.rows && i < sixLimit){
-					c6_0 = true;
-					c6 = outSixFrame.at<uchar>(j, i);
-					}
-					*/
-					if (j < result.rows && i < fifthLimit){
-						c5_0 = true;
-						c5 = RESULTS[4].at<uchar>(j, i);
-					}
-					if (j < result.rows && i < leftLimit && i > fifthLimit){
-						cL_0 = true;
-						cL = RESULTS[1].at<uchar>(j, i);
-					}
-					if (j < result.rows && i > baseLeftLimit && i < baseRightLimit) {
-						//cout << "cB is true" << endl;
-						cB_0 = true;
-						cB = RESULTS[0].at<uchar>(j, i);
-					}
-					if (j < result.rows && i>rightLimit && i < fourLimit) {
-						cR_0 = true;
-						cR = RESULTS[2].at<uchar>(j, i);
-					}
-					if (j < result.rows && i> fourLimit) {
-						c4_0 = true;
-						c4 = RESULTS[3].at<uchar>(j, i);
-					}
-
-
-
-					// Activate color based on flags
-					if (c5_0 && cL_0 && !cB_0 && !cR_0)
-					{
-						// Use combination of five + left
-						color = ((1 - blendA)*cL + blendA*c5);
-					}
-					else if (!c5_0 && cL_0 && cB_0 && !cR_0)
-					{
-						// Use combination of base + left
-						color = ((1 - blendA)*cL + blendA*cB);
-					}
-					else if (!c5_0 && !cL_0 && cB_0 && cR_0 && !c4_0)
-					{
-						// Use combination of base + right
-						color = ((1 - blendA)*cB + blendA*cR);
-					}
-					else if (!c5_0 && !cL_0 && !cB_0 && cR_0 && c4_0)
-					{
-						// Use combination of four + right
-						color = ((1 - blendA)*cR + blendA*c4);
-					}
-					/*
-					else if (c6_0 && c5_0 && !cL_0 && !cB_0 && !cR_0 && !c4_0)
-					{
-					// Use combination of six + five
-					color = ((1 - blendA)*c5 + blendA*c6);
-					}
-					*/
-					else if (!c6_0 && !c5_0 && !cL_0 && cB_0 && !cR_0 && !c4_0)
-					{
-						// In base's frame
-						color = cB;
-					}
-					else if (!c6_0 && !c5_0 && cL_0 && !cB_0 && !cR_0)
-					{
-						// In left's frame
-						color = cL;
-					}
-
-					else if (!c6_0 && !c5_0 && !cL_0 && !cB_0 && cR_0 && !c4_0)
-					{
-						// In right frame
-						color = cR;
-					}
-					else if (!c6_0 && !c5_0 && !cL_0 && !cB_0 && !cR_0 && c4_0)
-					{
-						// In fourth frame
-						color = c4;
-					}
-					else if (!c6_0 && c5_0 && !cL_0 && !cB_0 && !cR_0 && !c4_0)
-					{
-						// In fifth frame
-						color = c5;
-					}
-					/*
-					else if (c6_0 && !c5_0 && !cL_0 && !cB_0 && !cR_0 && !c4_0)
-					{
-					// In sixth frame
-					color = c6;
-					}
-					*/
-					//result.at<cv::Vec3b>(j, i) = color;
-					result.at<uchar>(j, i) = color;
-
-				}
-		}
-
-		croppedImage = result(Rect(topLeft.x, topLeft.y, croppedWidth, croppedHeight));
-		if (croppedImage.channels() == 3) {
-			cv::cvtColor(croppedImage, croppedImage, CV_RGB2BGR);
-		}
-
-		imshow("cropped Result", croppedImage);
-
-		//Latency Calculations
-		int _endWhileLoop = (int)getTickCount();
-		int _WhileLoopDiff = _endWhileLoop - _startWhileLoop;
-		float _secsForWhileLoop = (float)(_secsPerCycle * _WhileLoopDiff);
-		cout << "secs for Frame " << frameNo << " is " << _secsForWhileLoop << endl;
-		_totalSPF = _totalSPF + _secsForWhileLoop;
-
-		if ((frameNo % 30) == 0)
-		{
-			float _aveSPF = (float)_totalSPF / 30.0;
-			cout << "Average Seconds-Per-Frame for past 30 frames is: " << _aveSPF << endl;
-			_totalSPF = 0;
-		}
-		if (waitKey(30) == 110)
-		{
-			cout << "Saved Picture" << endl;
-			cv::imwrite("Result_2.jpg", croppedImage);
-		}
-		if (waitKey(30) == 27)
-			break;
-	}
-}
-
-int recordSimple() {
-
-	// Create blank image for instructions
-	cv::Mat directions_screen = cv::Mat(400, 300, CV_8UC3);
-	directions_screen.setTo(cv::Scalar(130, 120, 180));
-	putText(directions_screen, "Press on SPACE to Record!", cvPoint(30, 30),
-		FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(200, 200, 250), 1, CV_AA);
-
-	imshow("Directions Screen", directions_screen);
-	
-	// Get camera ready
-	cv::VideoCapture capB(BASE_CAM);
-	cv::VideoCapture capR(RIGHT_CAM);
-	cv::VideoCapture capL(LEFT_CAM);
-	cv::VideoCapture cap4(FOUR_CAM);
-	cv::VideoCapture cap5(FIFTH_CAM);
-	cv::VideoWriter outputVideoB, outputVideoL, outputVideoR, outputVideo4, outputVideo5;
-	capL.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
-	capL.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
-	capR.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
-	capR.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
-	capB.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
-	capB.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
-	cap4.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
-	cap4.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
-	cap5.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
-	cap5.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
-	int frameWidth = capL.get(CV_CAP_PROP_FRAME_WIDTH)*0.25;
-	int frameHeight = capL.get(CV_CAP_PROP_FRAME_HEIGHT)*0.25;
-	cv::Mat baseFrame, leftFrame, rightFrame, fourFrame, fiveFrame;
-	std::vector<cv::Mat> FRAMES(NO_OF_CAMS);
-
-	ImageOps *IO = new ImageOps();
-
-	//uni settings 
-	double Brightness;
-	double Contrast;
-	double Saturation;
-	double Gain;
-
-	Brightness = capB.get(CV_CAP_PROP_BRIGHTNESS);
-	Contrast = capB.get(CV_CAP_PROP_CONTRAST);
-	Saturation = capB.get(CV_CAP_PROP_SATURATION);
-	Gain = capB.get(CV_CAP_PROP_GAIN);
-
-	cout << "Brightness: " << Brightness;
-	cout << "Contrast: " << Contrast;
-	cout << "Saturation: " << Saturation;
-	cout << "Gain: " << Gain;
-
-	capB.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
-	capL.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
-	capR.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
-	cap4.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
-	cap5.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
-
-	capB.set(CV_CAP_PROP_CONTRAST, Contrast);
-	capL.set(CV_CAP_PROP_CONTRAST, Contrast);
-	capR.set(CV_CAP_PROP_CONTRAST, Contrast);
-	cap4.set(CV_CAP_PROP_CONTRAST, Contrast);
-	cap5.set(CV_CAP_PROP_CONTRAST, Contrast);
-
-	capB.set(CV_CAP_PROP_SATURATION, Saturation);
-	capL.set(CV_CAP_PROP_SATURATION, Saturation);
-	capR.set(CV_CAP_PROP_SATURATION, Saturation);
-	cap4.set(CV_CAP_PROP_SATURATION, Saturation);
-	cap5.set(CV_CAP_PROP_SATURATION, Saturation);
-
-	capB.set(CV_CAP_PROP_GAIN, Gain);
-	capL.set(CV_CAP_PROP_GAIN, Gain);
-	capR.set(CV_CAP_PROP_GAIN, Gain);
-	cap4.set(CV_CAP_PROP_GAIN, Gain);
-	cap5.set(CV_CAP_PROP_GAIN, Gain);
-
-	outputVideoL.open(camLOutput, -1, 30, cv::Size(frameHeight, frameWidth), true);
-	outputVideoR.open(camROutput, -1, 30, cv::Size(frameHeight, frameWidth), true);
-	outputVideoB.open(camBOutput, -1, 30, cv::Size(frameHeight, frameWidth), true);
-	outputVideo4.open(cam4Output, -1, 30, cv::Size(frameHeight, frameWidth), true);
-	outputVideo5.open(cam5Output, -1, 30, cv::Size(frameHeight, frameWidth), true);
-
-	while (1) {
-		capB >> FRAMES[0];
-		capL >> FRAMES[1];
-		capR >> FRAMES[2];
-		cap4 >> FRAMES[3];
-		cap5 >> FRAMES[4];
-
-
-		IO->IO_resize(FRAMES, cv::Size(frameWidth, frameHeight));
-		IO->IO_transpose(FRAMES);
-		IO->IO_flip(FRAMES, 1);
-
-		outputVideoB << FRAMES[0];
-		outputVideoL << FRAMES[1];
-		outputVideoR << FRAMES[2];
-		outputVideo4 << FRAMES[3];
-		outputVideo5 <<	FRAMES[4];
-
-		imshow("Base", FRAMES[0]);
-		imshow("Left", FRAMES[1]);
-		imshow("Right", FRAMES[2]);
-		imshow("Four", FRAMES[3]);
-		imshow("Five", FRAMES[4]);
-
-		if (waitKey(30) == ' ')
-			break;
-	}
-
-	return 1;
-}
 
 int record()
 {
@@ -1609,170 +962,55 @@ int record()
 
 			imshow("Directions Screen", directions_screen);
 
-			cv::VideoCapture capB(BASE_CAM);
-			cv::VideoCapture capR(RIGHT_CAM);
-			cv::VideoCapture capL(LEFT_CAM);
-			cv::VideoCapture cap4(FOUR_CAM);
-			cv::VideoCapture cap5(FIFTH_CAM);
-			cv::VideoWriter outputVideoB, outputVideoL, outputVideoR, outputVideo4, outputVideo5;
-			capL.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
-			capL.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
-			capR.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
-			capR.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
-			capB.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
-			capB.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
-			cap4.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
-			cap4.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
-			cap5.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
-			cap5.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
-			int frameWidth = capL.get(CV_CAP_PROP_FRAME_WIDTH)*0.25;
-			int frameHeight = capL.get(CV_CAP_PROP_FRAME_HEIGHT)*0.25;
-			cv::Mat baseFrame, leftFrame, rightFrame, fourFrame, fiveFrame;
-			//uni settings 
+			std::vector<int> cameraPorts(NO_OF_CAMS);
+			cameraPorts[0] = BASE_CAM;
+			cameraPorts[1] = LEFT_CAM;
+			cameraPorts[2] = RIGHT_CAM;
+			cameraPorts[3] = FOUR_CAM;
+			cameraPorts[4] = FIFTH_CAM;
+			CameraOps *CO = new CameraOps(cameraPorts);
+			ImageOps *IO = new ImageOps();
+
+			std::vector<cv::Point2f> scene_cornersLeft, scene_cornersRight, scene_cornersBase, scene_cornersFour, scene_cornersFive, scene_cornersSix, scene_corners;
+			CO->CO_setProp(CV_CAP_PROP_FRAME_WIDTH, 1920);
+			CO->CO_setProp(CV_CAP_PROP_FRAME_HEIGHT, 1080);
+
 			double Brightness;
 			double Contrast;
 			double Saturation;
 			double Gain;
 
-			Brightness = capB.get(CV_CAP_PROP_BRIGHTNESS);
-			Contrast = capB.get(CV_CAP_PROP_CONTRAST);
-			Saturation = capB.get(CV_CAP_PROP_SATURATION);
-			Gain = capB.get(CV_CAP_PROP_GAIN);
+			Brightness = CO->CO_getProp(CV_CAP_PROP_BRIGHTNESS, 0);
+			Contrast = CO->CO_getProp(CV_CAP_PROP_CONTRAST, 0);
+			Saturation = CO->CO_getProp(CV_CAP_PROP_SATURATION, 0);
+			Gain = CO->CO_getProp(CV_CAP_PROP_GAIN, 0);
 
 			cout << "Brightness: " << Brightness;
 			cout << "Contrast: " << Contrast;
 			cout << "Saturation: " << Saturation;
 			cout << "Gain: " << Gain;
 
-			capB.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
-			capL.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
-			capR.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
-			cap4.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
-			cap5.set(CV_CAP_PROP_BRIGHTNESS, Brightness);
+			CO->CO_setProp(CV_CAP_PROP_BRIGHTNESS, Brightness);
+			CO->CO_setProp(CV_CAP_PROP_CONTRAST, Contrast);
+			CO->CO_setProp(CV_CAP_PROP_SATURATION, Saturation);
+			CO->CO_setProp(CV_CAP_PROP_GAIN, Gain);
 
-			capB.set(CV_CAP_PROP_CONTRAST, Contrast);
-			capL.set(CV_CAP_PROP_CONTRAST, Contrast);
-			capR.set(CV_CAP_PROP_CONTRAST, Contrast);
-			cap4.set(CV_CAP_PROP_CONTRAST, Contrast);
-			cap5.set(CV_CAP_PROP_CONTRAST, Contrast);
-
-			capB.set(CV_CAP_PROP_SATURATION, Saturation);
-			capL.set(CV_CAP_PROP_SATURATION, Saturation);
-			capR.set(CV_CAP_PROP_SATURATION, Saturation);
-			cap4.set(CV_CAP_PROP_SATURATION, Saturation);
-			cap5.set(CV_CAP_PROP_SATURATION, Saturation);
-
-			capB.set(CV_CAP_PROP_GAIN, Gain);
-			capL.set(CV_CAP_PROP_GAIN, Gain);
-			capR.set(CV_CAP_PROP_GAIN, Gain);
-			cap4.set(CV_CAP_PROP_GAIN, Gain);
-			cap5.set(CV_CAP_PROP_GAIN, Gain);
-
-			//Get GPU ready
-			cv::gpu::setDevice(0);
-			cv::Mat tmp;
-			capL.read(tmp);
-			cv::gpu::GpuMat templ_d(tmp); // Warm up the cores
-
-			cv::gpu::GpuMat imageBSrc, imageBDst, imageRSrc, imageRDst, imageLSrc, image4Src, image4Dst, image5Src, image5Dst, imageLDst, image6Dst, image6Src;
-			cv::Mat outLeftFrame, outRightFrame, outBaseFrame, outFourFrame, outFiveFrame, outSixFrame;
-			outLeftFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-			outRightFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-			outBaseFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-			outFourFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-			outFiveFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-			outSixFrame = cv::Mat(frameWidth, frameHeight, useGrayScale ? CV_8UC1 : CV_8UC3);
-			cv::gpu::Stream streamL, streamR, streamB, stream4, stream5, stream6;
-			outputVideoL.open(camLOutput, -1, 30, cv::Size(frameHeight, frameWidth), true);
-			outputVideoR.open(camROutput, -1, 30, cv::Size(frameHeight, frameWidth), true);
-			outputVideoB.open(camBOutput, -1, 30, cv::Size(frameHeight, frameWidth), true);
-			outputVideo4.open(cam4Output, -1, 30, cv::Size(frameHeight, frameWidth), true);
-			outputVideo5.open(cam5Output, -1, 30, cv::Size(frameHeight, frameWidth), true);
+			int frameWidth = CO->CO_getProp(CV_CAP_PROP_FRAME_WIDTH, 0)*0.25;
+			int frameHeight = CO->CO_getProp(CV_CAP_PROP_FRAME_HEIGHT, 0)*0.25;
+			
+			MemoryManager *MM = new MemoryManager(NO_OF_CAMS, PREPROCESS_FRAMES_PATH, frameHeight, frameWidth);
 
 			while (1)
 			{
-				capB >> baseFrame;
-				capR >> rightFrame;
-				capL >> leftFrame;
-				cap4 >> fourFrame;
-				cap5 >> fiveFrame;
+				CO->CO_captureFrames(FRAMES);
 
-				cv::circle(baseFrame, cv::Point(frameWidth / 2, frameHeight / 2), 5, cv::Scalar(0, 255, 0), 2);
-				cv::circle(rightFrame, cv::Point(frameWidth / 2, frameHeight / 2), 5, cv::Scalar(0, 255, 0), 2);
-				cv::circle(leftFrame, cv::Point(frameWidth / 2, frameHeight / 2), 5, cv::Scalar(0, 255, 0), 2);
-				cv::circle(fourFrame, cv::Point(frameWidth / 2, frameHeight / 2), 5, cv::Scalar(0, 255, 0), 2);
-				cv::circle(fiveFrame, cv::Point(frameWidth / 2, frameHeight / 2), 5, cv::Scalar(0, 255, 0), 2);
+				MM->writeVideoFrames(FRAMES);
 
-
-
-				//Upload back to GPU
-
-				if (useGrayScale) {
-					cv::cvtColor(leftFrame, leftFrame, CV_RGB2GRAY);
-
-					cv::cvtColor(rightFrame, rightFrame, CV_RGB2GRAY);
-					cv::cvtColor(baseFrame, baseFrame, CV_RGB2GRAY);
-					cv::cvtColor(fourFrame, fourFrame, CV_RGB2GRAY);
-					cv::cvtColor(fiveFrame, fiveFrame, CV_RGB2GRAY);
-
-					streamL.enqueueUpload(leftFrame, imageLSrc);
-					streamR.enqueueUpload(rightFrame, imageRSrc);
-					streamB.enqueueUpload(baseFrame, imageBSrc);
-					stream4.enqueueUpload(fourFrame, image4Src);
-					stream5.enqueueUpload(fiveFrame, image5Src);
-					std::cout << useGrayScale << " UseGrayScale enabled" << std::endl;
-					/*	gpu::cvtColor(imageRSrc, imageRDst, CV_RGB2GRAY, streamR);
-					gpu::cvtColor(imageBSrc, imageBDst, CV_RGB2GRAY, streamB);
-					gpu::cvtColor(imageLSrc, imageLDst, CV_RGB2GRAY, streamL);
-					gpu::cvtColor(image4Src, image4Dst, CV_RGB2GRAY, stream4);
-					gpu::cvtColor(image5Src, image5Dst, CV_RGB2GRAY, stream5);*/
-				}
-				else {
-					imageRDst = imageRSrc;
-					imageBDst = imageBSrc;
-					imageLDst = imageLSrc;
-					image4Dst = image4Src;
-					image5Dst = image5Src;
-				}
-
-				//cvtColor(sixFrame, sixFrame, CV_RGB2GRAY);
-				gpu::resize(imageRDst, imageRSrc, cv::Size(frameWidth, frameHeight), streamR);
-				gpu::resize(imageBDst, imageBSrc, cv::Size(frameWidth, frameHeight), streamB);
-				gpu::resize(imageLDst, imageLSrc, cv::Size(frameWidth, frameHeight), streamL);
-				gpu::resize(image4Dst, image4Src, cv::Size(frameWidth, frameHeight), stream4);
-				gpu::resize(image5Dst, image5Src, cv::Size(frameWidth, frameHeight), stream5);
-
-				//resize(sixFrame, sixFrame, cv::Size(frameWidth, frameHeight));
-				gpu::transpose(imageRSrc, imageRDst, streamR);
-				gpu::transpose(imageBSrc, imageBDst, streamB);
-				gpu::transpose(imageLSrc, imageLDst, streamL);
-				gpu::transpose(image4Src, image4Dst, stream4);
-				gpu::transpose(image5Src, image5Dst, stream5);
-
-				//cv::transpose(sixFrame, sixFrame);
-				gpu::flip(imageRDst, imageRSrc, 1, streamR);
-				gpu::flip(imageBDst, imageBSrc, 1, streamB);
-				gpu::flip(imageLDst, imageLSrc, 1, streamL);
-				gpu::flip(image4Dst, image4Src, 1, stream4);
-				gpu::flip(image5Dst, image5Src, 1, stream5);
-
-				streamL.enqueueDownload(imageLSrc, outLeftFrame);
-				streamR.enqueueDownload(imageRSrc, outRightFrame);
-				streamB.enqueueDownload(imageBSrc, outBaseFrame);
-				stream4.enqueueDownload(image4Src, outFourFrame);
-				stream5.enqueueDownload(image5Src, outFiveFrame);
-
-				outputVideoL << outLeftFrame;
-				outputVideoR << outRightFrame;
-				outputVideoB << outBaseFrame;
-				outputVideo4 << outFourFrame;
-				outputVideo5 << outFiveFrame;
-
-				imshow("Base", outBaseFrame);
-				imshow("Right", outRightFrame);
-				imshow("Left", outLeftFrame);
-				imshow("Four", outFourFrame);
-				imshow("Five", outFiveFrame);
+				imshow("Base", FRAMES[0]);
+				imshow("Left", FRAMES[1]);
+				imshow("Right", FRAMES[2]);
+				imshow("Four", FRAMES[3]);
+				imshow("Five", FRAMES[4]);
 
 				if (waitKey(30) == ' ')
 					break;
