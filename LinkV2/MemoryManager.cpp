@@ -22,18 +22,18 @@ MemoryManager::~MemoryManager()
 void MemoryManager::readFrames(std::vector<cv::Mat> &FRAMES, std::string baseFileName){
 
 	for (int i = 0; i < FRAMES.size(); i++){
-		std::string frameName = baseFileName + "_0";
+		std::string frameName = baseFileName + "_" + std::to_string(i);
 		FRAMES[0] = cv::imread(frameName);
 	}
 }
 
-void MemoryManager::writeStaticFrames(std::vector<cv::Mat> &FRAMES, std::string baseFileName){
+void MemoryManager::writeStaticFrames(std::vector<cv::Mat> &FRAMES, int NO_OF_FRAMES, std::string baseFileName){
 
 	//error checking
 
-	for (int i = 0; i < FRAMES.size(); i++){
-		std::string frameName = baseFileName + "_0";
-		cv::imwrite(frameName, FRAMES[0]);
+	for (int i = 0; i < NO_OF_FRAMES; i++){
+		std::string frameName = baseFileName + "_" + std::to_string(i) + ".png";
+		cv::imwrite(frameName, FRAMES[i]);
 	}
 
 }
@@ -43,7 +43,7 @@ void MemoryManager::writeVideoFrames(std::vector<cv::Mat> &FRAMES){
 	//error checking
 
 	for (int i = 0; i < FRAMES.size(); i++){
-		videoWriters[i] << FRAMES[0];
+		videoWriters[i] << FRAMES[i];
 	}
 
 }

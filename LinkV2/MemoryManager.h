@@ -22,7 +22,7 @@ public:
 	~MemoryManager();
 
 	void readFrames(std::vector<cv::Mat> &FRAMES, std::string baseFileName);
-	void writeStaticFrames(std::vector<cv::Mat> &FRAMES, std::string baseFileName);
+	void writeStaticFrames(std::vector<cv::Mat> &FRAMES, int NO_OF_FRAMES, std::string baseFileName);
 	void writeVideoFrames(std::vector<cv::Mat> &FRAMES);
 
 private:

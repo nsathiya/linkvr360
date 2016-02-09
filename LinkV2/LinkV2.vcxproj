@@ -149,6 +149,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="BlenderOps.cpp" />
     <ClCompile Include="CameraOps.cpp" />
     <ClCompile Include="GPUOps.cpp" />
     <ClCompile Include="ImageOps.cpp" />
@@ -156,6 +157,7 @@
     <ClCompile Include="Source.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="BlenderOps.h" />
     <ClInclude Include="CameraOps.h" />
     <ClInclude Include="GPUOps.h" />
     <ClInclude Include="ImageOps.h" />

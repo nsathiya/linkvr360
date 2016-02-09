@@ -30,6 +30,9 @@
     <ClCompile Include="MemoryManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="BlenderOps.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ImageOps.h">
@@ -42,6 +45,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="MemoryManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="BlenderOps.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -31,7 +31,7 @@ void GPUOps::GO_uploadStream(std::vector<cv::Mat> &FRAMES){
 	}
 }
 
-void GPUOps::GO_perspectiveTransform(std::vector<cv::Mat> externalCoeffs, int resultHeight, int resultWidth){
+void GPUOps::GO_warpPerspective(std::vector<cv::Mat> externalCoeffs, int resultHeight, int resultWidth){
 	//error statements
 
 	for (int i = 0; i < streams.size(); i++){

@@ -14,20 +14,19 @@
 #include <opencv2/highgui/highgui_c.h>
 #include "opencv2/imgproc/imgproc_c.h"
 #include "opencv2/nonfree/nonfree.hpp"
-#include <opencv2/gpu/gpu.hpp>
 
-class GPUOps
+class BlenderOps
 {
 public:
-	GPUOps(int NO_OF_CAMS);
-	~GPUOps();
-	void GO_uploadStream(std::vector<cv::Mat> &FRAMES);
-	void GO_warpPerspective(std::vector<cv::Mat> externalCoeffs, int resultHeight, int resultWidth);
-	void GPUOps::GO_downloadStream(std::vector<cv::Mat> &RESULTS);
+	struct limit {
+		int leftXLimit;
+		int rightXLimit;
+	};
 
-private:
-	std::vector<cv::gpu::GpuMat> IMAGEFRAMES;
-	std::vector<cv::gpu::GpuMat> RESULTFRAMES;
-	std::vector<cv::gpu::Stream> streams;
+	BlenderOps();
+	~BlenderOps();
+	void BO_alphaBlend(std::vector<cv::Mat> &RESULTS, float blendAlpha, cv::Mat &BLENDEDRESULT);
+	
+	limit limitPt; 
 };
 
