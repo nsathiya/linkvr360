@@ -32,7 +32,7 @@ const int RIGHT_CAM = 2; // 1; // 2; // 4;
 const int FOUR_CAM = 1; 
 const int FIFTH_CAM = 2;
 const int BACK_CAM = 5;
-const int NO_OF_CAMS = 2;
+const int NO_OF_CAMS = 3;
 
 string videoPath = "samples";
 string preprocess = videoPath + "/preprocess";
@@ -134,12 +134,12 @@ int main() {
 		}
 		else if (optionSelected == 'c')
 		{
-			if (calibrateCamerasExternal(BASE_CAM, LEFT_CAM) == 1)
+			if (calibrateCamerasExternal(BASE_CAM, RIGHT_CAM) == 1)
 				return 0;
 		}
 		else if (optionSelected == 'i')
 		{
-			if (calibrateCamerasInternal(LEFT_CAM) == 1)
+			if (calibrateCamerasInternal(RIGHT_CAM) == 1)
 				return 0;
 		}
 		else if (optionSelected == 'g') {
@@ -159,7 +159,7 @@ void setup()
 
 	FOCAL[0] = CAM_F_MAP[BASE_CAM] = 395.164;
 	FOCAL[1] = CAM_F_MAP[LEFT_CAM] = 422.400;
-	//FOCAL[2] = CAM_F_MAP[RIGHT_CAM] = 171.575;
+	FOCAL[2] = CAM_F_MAP[RIGHT_CAM] = 326.38;
 	//FOCAL[3] = CAM_F_MAP[FOUR_CAM] = 176.9511;
 	//FOCAL[4] = CAM_F_MAP[FIFTH_CAM] = 175.2695;
 	//CAM_F_MAP[BACK_CAM] = 175.2695;
@@ -229,25 +229,25 @@ void setup()
 
 	INTRINSICCOEFFS[0] = baseIntrinsic;
 	INTRINSICCOEFFS[1] = leftIntrinsic;
-	//INTRINSICCOEFFS[2] = rightIntrinsic;
+	INTRINSICCOEFFS[2] = rightIntrinsic;
 	//INTRINSICCOEFFS[3] = fourIntrinsic;
 	//INTRINSICCOEFFS[4] = fiveIntrinsic;
 
 	DISTORTIONCOEFFS[0] = baseDistCoeffs;
 	DISTORTIONCOEFFS[1] = leftDistCoeffs;
-	//DISTORTIONCOEFFS[2] = rightDistCoeffs;
+	DISTORTIONCOEFFS[2] = rightDistCoeffs;
 	//DISTORTIONCOEFFS[3] = fourDistCoeffs;
 	//DISTORTIONCOEFFS[4] = fiveDistCoeffs;
 	
 	EXTRINSICCOEFFS[0] = NULL;
 	EXTRINSICCOEFFS[1] = HL;
-	//EXTRINSICCOEFFS[2] = HR;
+	EXTRINSICCOEFFS[2] = HR;
 	//EXTRINSICCOEFFS[3] = H4;
 	//EXTRINSICCOEFFS[4] = H5;
 
 	PREPROCESS_FRAMES_PATH[0] = camBOutput;
-	PREPROCESS_FRAMES_PATH[0] = camLOutput;
-	//PREPROCESS_FRAMES_PATH[0] = camROutput;
+	PREPROCESS_FRAMES_PATH[1] = camLOutput;
+	PREPROCESS_FRAMES_PATH[2] = camROutput;
 	//PREPROCESS_FRAMES_PATH[0] = cam4Output;
 	//PREPROCESS_FRAMES_PATH[0] = cam5Output;
 
@@ -300,7 +300,7 @@ int showFrames()
 	std::vector<int> cameraPorts(NO_OF_CAMS);
 	cameraPorts[0] = BASE_CAM;
 	cameraPorts[1] = LEFT_CAM;
-	//cameraPorts[2] = RIGHT_CAM;
+	cameraPorts[2] = RIGHT_CAM;
 	//cameraPorts[3] = FOUR_CAM;
 	//cameraPorts[4] = FIFTH_CAM;
 	CameraOps *CO = new CameraOps(cameraPorts);
@@ -342,7 +342,7 @@ int showFrames()
 
 		imshow("base Frame",  FRAMES[0]);
 		imshow("left Frame",  FRAMES[1]);
-		//imshow("right Frame", FRAMES[2]);
+		imshow("right Frame", FRAMES[2]);
 		//imshow("four Frame",  FRAMES[3]);
 		//imshow("five Frame",  FRAMES[4]);*/
 		//imshow("sixth Frame", sixFrame);
@@ -450,7 +450,7 @@ int testingFunction(bool GPU) {
 	std::vector<int> cameraPorts(NO_OF_CAMS);
 	cameraPorts[0] = BASE_CAM;
 	cameraPorts[1] = LEFT_CAM;
-	//cameraPorts[2] = RIGHT_CAM;
+	cameraPorts[2] = RIGHT_CAM;
 	//cameraPorts[3] = FOUR_CAM;
 	//cameraPorts[4] = FIFTH_CAM;
 	CameraOps *CO = new CameraOps(cameraPorts);
@@ -616,9 +616,9 @@ int testingFunction(bool GPU) {
 	float _totalSPF = 0;
 
 	//Initialize needed variables for GPU
-	RESULTS[0] = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
-	RESULTS[1] = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
-	//RESULTS[2] = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
+	RESULTS[0] = cv::Mat(resultWidth, resultHeight+1000, useGrayScale ? CV_8UC1 : CV_8UC3);
+	RESULTS[1] = cv::Mat(resultWidth, resultHeight+1000, useGrayScale ? CV_8UC1 : CV_8UC3);
+	RESULTS[2] = cv::Mat(resultWidth, resultHeight+1000, useGrayScale ? CV_8UC1 : CV_8UC3);
 	//RESULTS[3] = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
 	//RESULTS[4] = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
 	//outSixFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
@@ -627,7 +627,7 @@ int testingFunction(bool GPU) {
 	cout << "HL: " << HL << endl;
 	cout << "Base array extrinsic: " << EXTRINSICCOEFFS[0] << endl;
 	cout << "Left array extrinsic: " << EXTRINSICCOEFFS[1] << endl;
-	cv::Mat dist1Masked, dist2Masked, blendMaskSum;
+	cv::Mat dist1Masked, dist2Masked, dist3Masked, blendMaskSum;
 
 	while (1)
 	{
@@ -643,36 +643,43 @@ int testingFunction(bool GPU) {
 		IO->IO_rectilinearProject(FRAMES, 0, FOCAL);
 		if (GPU){
 			GO->GO_uploadStream(FRAMES);
-			GO->GO_warpPerspective(EXTRINSICCOEFFS, resultHeight + 600, resultWidth);
+			GO->GO_warpPerspective(EXTRINSICCOEFFS, resultHeight+1000, resultWidth);
 			GO->GO_downloadStream(RESULTS);
 		}
 		else {
-			IO->IO_warpPerspective(FRAMES, RESULTS, EXTRINSICCOEFFS, cv::Size(resultHeight + 600, resultWidth));
+			IO->IO_warpPerspective(FRAMES, RESULTS, EXTRINSICCOEFFS, cv::Size(resultHeight+1000, resultWidth));
 		}
 		//MM->writeStaticFrames(RESULTS, 1, "WarpPerspective()");
-		//BLENDING TEST
-		//imshow("0 - PreBlend", RESULTS[0]);
-		//imshow("1 - PreBlend", RESULTS[1]);
-		//waitKey(0);
+		
 
 		if (frameNo == 1){
-			Mat m1, m2;
+			
+			//BLENDING TEST
+			/*imshow("0 - PreBlend", RESULTS[0]);
+			imshow("1 - PreBlend", RESULTS[1]);
+			waitKey(0);
+*/
+			Mat m1, m2, m3;
 			//m1 = RESULTS[0](Rect(0, 0, BO->limitPt.rightXLimit, RESULTS[0].rows));
 			//m1.setTo(1);
 			//m2 = RESULTS[1](Rect(BO->limitPt.leftXLimit, 0, RESULTS[0].cols - BO->limitPt.leftXLimit, RESULTS[0].rows));
 			//m2.setTo(1);
 			cv::threshold(RESULTS[0], m1, 0, 255, cv::THRESH_BINARY);
 			cv::threshold(RESULTS[1], m2, 0, 255, cv::THRESH_BINARY);
+			cv::threshold(RESULTS[2], m3, 0, 255, cv::THRESH_BINARY);
 
 			//imshow("0 - Mask", m1);
 			//imshow("1 - Mask", m2);
+			//imshow("2 - Mask", m3);
 			//waitKey(0);
 
-			cv::Mat bothMasks = m1 | m2;
+			cv::Mat bothMasks = m1 | m2 | m3;
+			cv::Mat ampersandMasks = m1 & m2 & m3;
 			cv::Mat noMask = 255 - bothMasks;
 
 			//imshow("0 - Both Mask", bothMasks);
-			//imshow("1 - No Mask", noMask);
+			//imshow("0 - Ampersand Mask", ampersandMasks);
+			//imshow("0 - No Mask", noMask);
 			//waitKey(0);
 
 			cv::Mat rawAlpha = cv::Mat(noMask.rows, noMask.cols, CV_32FC1);
@@ -680,52 +687,71 @@ int testingFunction(bool GPU) {
 
 			cv::Mat border1 = 255 - border(m1);
 			cv::Mat border2 = 255 - border(m2);
+			cv::Mat border3 = 255 - border(m3);
+
 			//cv::imshow("0 - border1", border1);
-			//cv::imshow("0 - border2", border2);
+			//cv::imshow("1 - border2", border2);
+			//cv::imshow("2 - border3", border3);
 			//waitKey(0);
 
-			cv::Mat dist1, dist2;
+			cv::Mat dist1, dist2, dist3;
 			cv::distanceTransform(border1, dist1, CV_DIST_L2, 3);
 			cv::distanceTransform(border2, dist2, CV_DIST_L2, 3);
+			cv::distanceTransform(border3, dist3, CV_DIST_L2, 3);
 			double min, max;
 			cv::Point minLoc, maxLoc;
 			cv::minMaxLoc(dist1, &min, &max, &minLoc, &maxLoc, m1&(dist1 > 0));
-			cv::minMaxLoc(dist2, &min, &max, &minLoc, &maxLoc, m2&(dist2 > 0));
 			dist1 = dist1* 1.0 / max;
+			cv::minMaxLoc(dist2, &min, &max, &minLoc, &maxLoc, m2&(dist2 > 0));
 			dist2 = dist2* 1.0 / max;
+			cv::minMaxLoc(dist3, &min, &max, &minLoc, &maxLoc, m3&(dist3 > 0));
+			dist3 = dist3* 1.0 / max;
 
-			
+			/*cv::imshow("0 - Distance", dist1);
+			cv::imshow("1 - Distance", dist2);
+			waitKey(0);
+			*/
 			rawAlpha.copyTo(dist1Masked, noMask);
 			dist1.copyTo(dist1Masked, m1);
-			rawAlpha.copyTo(dist1Masked, m1&(255 - m2));
+			rawAlpha.copyTo(dist1Masked, m1&(255 - m2 - m3));
 
-			
 			rawAlpha.copyTo(dist2Masked, noMask);
 			dist2.copyTo(dist2Masked, m2);
-			rawAlpha.copyTo(dist2Masked, m2&(255 - m1));
+			rawAlpha.copyTo(dist2Masked, m2&(255 - m1 - m3));
 
-			//cv::imshow("0 - Distance Masked", dist1Masked);
-			//cv::imshow("1 - Distance Masked", dist2Masked);
+			rawAlpha.copyTo(dist3Masked, noMask);
+			dist3.copyTo(dist3Masked, m3);
+			rawAlpha.copyTo(dist3Masked, m3&(255 - m1 - m2));
+
+			/*cv::imshow("0 - Distance Masked", dist1Masked);
+			cv::imshow("1 - Distance Masked", dist2Masked);
+			cv::imshow("3 - Distance Masked", dist3Masked);
+			waitKey(0);*/
+
+			blendMaskSum = dist1Masked + dist2Masked + dist3Masked;
+			//cv::imshow("0 - BlendMaskSum", blendMaskSum);
 			//waitKey(0);
 
-			blendMaskSum = dist1Masked + dist2Masked;
 		}
 
-		cv::Mat im1Float, im2Float; 
+		cv::Mat im1Float, im2Float, im3Float; 
 		RESULTS[0].convertTo(im1Float, dist1Masked.type());
 		RESULTS[1].convertTo(im2Float, dist2Masked.type());
+		RESULTS[2].convertTo(im3Float, dist3Masked.type());
 		cv::Mat im1Alpha = dist1Masked.mul(im1Float);
 		cv::Mat im2Alpha = dist2Masked.mul(im2Float);
+		cv::Mat im3Alpha = dist3Masked.mul(im3Float);
 
-		//cv::imshow("0 - Blended", im1Alpha/255.0);
-		//cv::imshow("1 - Blended", im2Alpha/255.0);
-		//waitKey(0);
+		/*cv::imshow("0 - Blended", im1Alpha/255.0);
+		cv::imshow("1 - Blended", im2Alpha/255.0);
+		cv::imshow("2 - Blended", im3Alpha/ 255.0);
+		waitKey(0);*/
 
-		cv::Mat imBlended = (im1Alpha + im2Alpha) / blendMaskSum;
+		cv::Mat imBlended = (im1Alpha + im2Alpha + im3Alpha) / blendMaskSum;
 
-		//cv::imshow("0 - Blended and Merged", imBlended / 255.0);
-		//waitKey(0);
-
+		/*cv::imshow("0 - Blended and Merged", imBlended / 255.0);
+		waitKey(0);
+*/
 
 		//BO->BO_alphaBlend(RESULTS, 0.3, result);
 		//result = imBlended;
@@ -2207,12 +2233,12 @@ int calibrateCamerasExternal(int baseCam, int sideCam)
 			cout << "base is left cam" << endl;
 			undistort(baseFrame, undistortedBaseFrame, INTRINSICCOEFFS[1], DISTORTIONCOEFFS[1]);
 		}
-		/*
 		else if (baseCam == RIGHT_CAM)
 		{
 			cout << "base is right cam" << endl;
 			undistort(baseFrame, undistortedBaseFrame, rightIntrinsic, rightDistCoeffs);
 		}
+		/*
 		else if (baseCam == FIFTH_CAM)
 		{
 			cout << "base is fifth cam" << endl;
@@ -2220,12 +2246,12 @@ int calibrateCamerasExternal(int baseCam, int sideCam)
 		}
 
 		
-
+		*/
 		if (sideCam == RIGHT_CAM)
 		{
 			cout << "undistorting right cam" << endl;
 			undistort(rightFrame, undistortedRightFrame, rightIntrinsic, rightDistCoeffs);
-		}*/
+		}
 		if (sideCam == LEFT_CAM)
 		{
 			cout << "undistorting left cam" << endl;
