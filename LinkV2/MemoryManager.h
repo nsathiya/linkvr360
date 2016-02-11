@@ -18,7 +18,7 @@
 class MemoryManager
 {
 public:
-	MemoryManager(int NO_OF_CAMS, std::vector<std::string> output, int frameHeight, int frameWidth);
+	MemoryManager(int NO_OF_CAMS, std::vector<std::string> output, int frameHeight, int frameWidth, bool Video);
 	~MemoryManager();
 
 	void readFrames(std::vector<cv::Mat> &FRAMES, std::string baseFileName);

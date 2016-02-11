@@ -45,6 +45,7 @@ string camBOutput = preprocess + "/Cam_B_Stream.avi";
 string cam4Output = preprocess + "/Cam_4_Stream.avi";
 string cam5Output = preprocess + "/Cam_5_Stream.avi";
 string camResultOutput = videoPath + "/Cam_Result_Stream.avi";
+string camPicPrefix = preprocess + "/CamPic";
 
 // Distortion
 string H_File, IntrinsicBase_File, DistRight_File, IntrinsicRight_File, DistBase_File, IntrinsicLeft_File, DistLeft_File, IntrinsicFour_File, DistFour_File, IntrinsicFive_File, DistFive_File, IntrinsicSix_File, DistSix_File;
@@ -76,7 +77,8 @@ int record();
 int stitchLive(bool GPU);
 int stitchLiveWOGPU();
 int use360Camera();
-int testingFunction(bool GPU);
+int testingFunction(bool GPU, bool stitchFromMemory);
+int takePic();
 
 cv::Point2f convert_pt(cv::Point2f point, int w, int h, int INV_FLAG, float F);
 cv::Mat rectlinearProject(Mat ImgToCalibrate, bool INV_FLAG, float F);
@@ -97,7 +99,7 @@ int main() {
 	setup();
 
 	std::string MainMenu = "Welcome to Link's imaging module.\n"
-		"Press 'r' to Record and Stitch. \n"
+		"Press 'r' to Snap. \n"
 		"Press 'f' to Show Test Frames.\n"
 		"Press 'c' for External Calibration.\n"
 		"Press 'i' for Internal Calibration.\n"
@@ -124,7 +126,7 @@ int main() {
 		}
 		if (optionSelected == 'r')
 		{
-			if (use360Camera() == 1)
+			if (takePic() == 1)
 				return 0;
 		}
 		if (optionSelected == 'f')
@@ -148,7 +150,7 @@ int main() {
 			std::cout << "Color Mode is " << (useGrayScale ? "B&W" : "Color") << std::endl;
 		}
 		else if (optionSelected == 't') {
-			if (testingFunction(true) == 1)
+			if (testingFunction(true, true) == 1)
 				return 0;
 		}
 	}
@@ -439,7 +441,75 @@ int use360Camera()
 
 }
 
-int testingFunction(bool GPU) {
+int takePic() {
+
+	std::vector<int> cameraPorts(NO_OF_CAMS);
+	cameraPorts[0] = BASE_CAM;
+	cameraPorts[1] = LEFT_CAM;
+	cameraPorts[2] = RIGHT_CAM;
+	//cameraPorts[3] = FOUR_CAM;
+	//cameraPorts[4] = FIFTH_CAM;
+	CameraOps *CO = new CameraOps(cameraPorts);
+	ImageOps *IO = new ImageOps();
+
+	double Brightness;
+	double Contrast;
+	double Saturation;
+	double Gain;
+
+	Brightness = CO->CO_getProp(CV_CAP_PROP_BRIGHTNESS, 0);
+	Contrast = CO->CO_getProp(CV_CAP_PROP_CONTRAST, 0);
+	Saturation = CO->CO_getProp(CV_CAP_PROP_SATURATION, 0);
+	Gain = CO->CO_getProp(CV_CAP_PROP_GAIN, 0);
+
+	cout << "Brightness: " << Brightness;
+	cout << "Contrast: " << Contrast;
+	cout << "Saturation: " << Saturation;
+	cout << "Gain: " << Gain;
+
+	CO->CO_setProp(CV_CAP_PROP_BRIGHTNESS, Brightness);
+	CO->CO_setProp(CV_CAP_PROP_CONTRAST, Contrast);
+	CO->CO_setProp(CV_CAP_PROP_SATURATION, Saturation);
+	CO->CO_setProp(CV_CAP_PROP_GAIN, Gain);
+
+	int frameWidth = CO->CO_getProp(CV_CAP_PROP_FRAME_WIDTH, 0);
+	int frameHeight = CO->CO_getProp(CV_CAP_PROP_FRAME_HEIGHT, 0);
+
+	// Create blank image for instructions
+	cv::Mat directions_screen = cv::Mat(400, 300, CV_8UC3);
+	directions_screen.setTo(cv::Scalar(0, 0, 0));
+	putText(directions_screen, "Press on SPACE to Snap!", cvPoint(30, 30),
+		FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(0, 140, 255), 1, CV_AA);
+
+	imshow("Directions Screen", directions_screen);
+	
+	while (1)
+	{
+		if (waitKey(30) == ' ')
+		{
+			//directions_screen.setTo(cv::Scalar(255, 255, 180));
+			//putText(directions_screen, "Recording! Press SPACE to stop.", cvPoint(30, 30),
+				//FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(200, 200, 250), 1, CV_AA);
+
+			//imshow("Directions Screen", directions_screen);
+
+			cout << "instantiating memory manager" << endl;
+			MemoryManager *MM = new MemoryManager(NO_OF_CAMS, PREPROCESS_FRAMES_PATH, frameHeight, frameWidth, false);
+			cout << "caputuring frame from sensor" << endl;
+			CO->CO_captureFrames(FRAMES);
+			CO->CO_captureFrames(FRAMES);
+			cout << "memory manager saving frame" << endl;
+			MM->writeStaticFrames(FRAMES, NO_OF_CAMS, camPicPrefix);
+			break;
+		}
+
+	}
+
+	return 1;
+
+}
+
+int testingFunction(bool GPU, bool stitchFromMemory) {
 
 	std::string method = "w/o GPU";
 	if (GPU)
@@ -491,11 +561,11 @@ int testingFunction(bool GPU) {
 	bool record = false;
 	cout << frameWidth << " " << frameHeight << endl;
 	cv::Mat result = Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
-	MemoryManager *MM = new MemoryManager(NO_OF_CAMS, PREPROCESS_FRAMES_PATH, frameHeight, frameWidth);
+	MemoryManager *MM = new MemoryManager(NO_OF_CAMS, PREPROCESS_FRAMES_PATH, frameHeight, frameWidth, false);
 
 	// Move Scene to the right by 100
-	int x_offset = 600.0;
-	float y_offset = 0.0;
+	int x_offset = 400.0;
+	float y_offset = 100.0;
 	float z_offset = 100.0;
 	float transdata[] = { 1.0, 0.0, x_offset, 0.0, 1.0, y_offset, 0.0, 0.0, 1.0 };
 	cv::Mat trans(3, 3, CV_32FC1, transdata);
@@ -634,7 +704,13 @@ int testingFunction(bool GPU) {
 		frameNo++;
 		int _startWhileLoop = (int)getTickCount();
 
-		CO->CO_captureFrames(FRAMES);
+		if (stitchFromMemory){
+			MM->readFrames(FRAMES, camPicPrefix);
+		}
+		else {
+			CO->CO_captureFrames(FRAMES);
+		}
+
 		IO->IO_cvtColor(FRAMES, CV_RGB2GRAY);
 		//IO->IO_resize(FRAMES, cv::Size(frameWidth, frameHeight));
 		//IO->IO_transpose(FRAMES);
@@ -674,7 +750,7 @@ int testingFunction(bool GPU) {
 			//waitKey(0);
 
 			cv::Mat bothMasks = m1 | m2 | m3;
-			cv::Mat ampersandMasks = m1 & m2 & m3;
+			//cv::Mat ampersandMasks = m1 & m2 & m3;
 			cv::Mat noMask = 255 - bothMasks;
 
 			//imshow("0 - Both Mask", bothMasks);
@@ -756,13 +832,26 @@ int testingFunction(bool GPU) {
 		//BO->BO_alphaBlend(RESULTS, 0.3, result);
 		//result = imBlended;
 		imBlended.convertTo(result, CV_8UC1);
-		croppedImage = result(Rect(topLeft.x, topLeft.y, croppedWidth, croppedHeight));
+		//CHANGE
+		croppedImage = result(Rect(0,0, result.cols, result.rows/2));
 
 		if (croppedImage.channels() == 3) {
 			cv::cvtColor(croppedImage, croppedImage, CV_RGB2BGR);
 		}
 
-		imshow("cropped Result", result);
+		if (stitchFromMemory){
+			std::vector<cv::Mat> ResultFinal(1);
+			cv::Mat color_img;
+			cv::cvtColor(croppedImage, color_img, CV_GRAY2BGR);
+			putText(color_img , "moment in the orb", cvPoint(20, 30),
+				FONT_HERSHEY_DUPLEX, 0.8, cvScalar(0,144,255),1, CV_AA);
+			imshow("cropped Result", color_img);
+			waitKey(0);
+			ResultFinal[0] = color_img;
+			MM->writeStaticFrames(ResultFinal, 1, preprocess + "/FinalStitchedResult");
+			break;
+		}
+			
 
 		//waitKey(0);
 		//std::vector<cv::Mat> FINALARRAY(1);
@@ -858,7 +947,7 @@ int stitchLive(bool GPU) {
 	bool record = false;
 	cout << frameWidth << " " << frameHeight << endl;
 	cv::Mat result = Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
-	MemoryManager *MM = new MemoryManager(NO_OF_CAMS, PREPROCESS_FRAMES_PATH, frameHeight, frameWidth);
+	MemoryManager *MM = new MemoryManager(NO_OF_CAMS, PREPROCESS_FRAMES_PATH, frameHeight, frameWidth, true);
 
 	// Move Scene to the right by 100
 	int x_offset = 500;
@@ -1382,7 +1471,7 @@ int record()
 			int frameWidth = CO->CO_getProp(CV_CAP_PROP_FRAME_WIDTH, 0)*0.25;
 			int frameHeight = CO->CO_getProp(CV_CAP_PROP_FRAME_HEIGHT, 0)*0.25;
 			
-			MemoryManager *MM = new MemoryManager(NO_OF_CAMS, PREPROCESS_FRAMES_PATH, frameHeight, frameWidth);
+			MemoryManager *MM = new MemoryManager(NO_OF_CAMS, PREPROCESS_FRAMES_PATH, frameHeight, frameWidth, true);
 
 			while (1)
 			{
