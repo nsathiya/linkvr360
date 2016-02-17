@@ -149,7 +149,7 @@ cv::Mat ImageOps::rectlinearProject(cv::Mat ImgToCalibrate, bool INV_FLAG, float
 	int height = Img.rows;
 	int width = Img.cols;
 	cv::Mat destPic = cv::Mat(cv::Size(width, height), ImgToCalibrate.type());
-	std::cout << "rect linear " << ImgToCalibrate.type() << " " << CV_8UC3 << " " << CV_8UC1 << " " << CV_8UC4 << std::endl;
+	//std::cout << "rect linear " << ImgToCalibrate.type() << " " << CV_8UC3 << " " << CV_8UC1 << " " << CV_8UC4 << std::endl;
 	for (int y = 0; y < height; y++)
 	{
 		for (int x = 0; x < width; x++)

@@ -1,7 +1,7 @@
 #include "MemoryManager.h"
 
 
-MemoryManager::MemoryManager(int NO_OF_CAMS,std::vector<std::string> output, int frameHeight, int frameWidth, bool Video)
+MemoryManager::MemoryManager(int NO_OF_CAMS,std::vector<std::string> output, int frameWidth, int frameHeight, bool Video)
 {
 	//error checking
 
@@ -10,7 +10,7 @@ MemoryManager::MemoryManager(int NO_OF_CAMS,std::vector<std::string> output, int
 	if (Video)
 		for (int i=0; i < NO_OF_CAMS; i++){
 			cv::VideoWriter outputVideo;
-			outputVideo.open(output[i], -1, 30, cv::Size(frameHeight, frameWidth), true);
+			outputVideo.open(output[i], -1, 20, cv::Size(frameWidth, frameHeight), true);
 			videoWriters[i] = outputVideo;
 		}
 }

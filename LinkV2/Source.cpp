@@ -44,7 +44,7 @@ string camROutput = preprocess + "/Cam_R_Stream.avi";
 string camBOutput = preprocess + "/Cam_B_Stream.avi";
 string cam4Output = preprocess + "/Cam_4_Stream.avi";
 string cam5Output = preprocess + "/Cam_5_Stream.avi";
-string camResultOutput = videoPath + "/Cam_Result_Stream.avi";
+string camResultOutput = videoPath + "/results/Cam_Result_Stream.avi";
 string camPicPrefix = preprocess + "/CamPic";
 
 // Distortion
@@ -77,7 +77,7 @@ int record();
 int stitchLive(bool GPU);
 int stitchLiveWOGPU();
 int use360Camera();
-int testingFunction(bool GPU, bool stitchFromMemory);
+int testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo);
 int takePic();
 
 cv::Point2f convert_pt(cv::Point2f point, int w, int h, int INV_FLAG, float F);
@@ -91,6 +91,7 @@ std::vector<cv::Mat> EXTRINSICCOEFFS(NO_OF_CAMS);
 std::vector<cv::Mat> DISTORTIONCOEFFS(NO_OF_CAMS);
 std::vector<cv::Mat> RESULTS(NO_OF_CAMS);
 std::vector<std::string> PREPROCESS_FRAMES_PATH(NO_OF_CAMS);
+std::vector<std::string> RESULTS_FRAMES_PATH(1);
 std::vector<float> FOCAL(NO_OF_CAMS);
 
 int main() {
@@ -100,12 +101,11 @@ int main() {
 
 	std::string MainMenu = "Welcome to Link's imaging module.\n"
 		"Press 'r' to Snap. \n"
+		"Press 'c' to Record. \n"
 		"Press 'f' to Show Test Frames.\n"
 		"Press 'c' for External Calibration.\n"
 		"Press 'i' for Internal Calibration.\n"
 		"Press 'g' for B&W/Color mode switching.\n Current mode is Color. \n"
-		"Press 'a' for Stitch Live without GPU. \n"
-		"Press 'b' for Stitch Live with GPU \n"
 		"Press 't' for testing function.\n";
 	std::cout << MainMenu << std::endl;
 
@@ -114,7 +114,7 @@ int main() {
 		char optionSelected;
 		std::cin >> optionSelected;
 
-		if (optionSelected == 'a')
+		/*if (optionSelected == 'a')
 		{
 			if (stitchLive(false) == 1)
 				return 0;
@@ -123,11 +123,19 @@ int main() {
 		{
 			if (stitchLive(true) == 1)
 				return 0;
-		}
+		}*/
 		if (optionSelected == 'r')
 		{
 			if (takePic() == 1)
 				return 0;
+		}
+		if (optionSelected == 'c')
+		{
+			if (record() == 1){
+				cout << "capture ended" << endl;
+				break;
+				return 0;
+			}
 		}
 		if (optionSelected == 'f')
 		{
@@ -150,10 +158,12 @@ int main() {
 			std::cout << "Color Mode is " << (useGrayScale ? "B&W" : "Color") << std::endl;
 		}
 		else if (optionSelected == 't') {
-			if (testingFunction(true, true) == 1)
+			if (testingFunction(true, true, true) == 1)
 				return 0;
 		}
 	}
+	cout << "does it hit here" << endl;
+	return 0;
 }
 
 void setup()
@@ -253,6 +263,8 @@ void setup()
 	//PREPROCESS_FRAMES_PATH[0] = cam4Output;
 	//PREPROCESS_FRAMES_PATH[0] = cam5Output;
 
+	RESULTS_FRAMES_PATH[0] = camResultOutput;
+
 }
 
 void RightCallBackFunc2(int event, int x, int y, int flags, void* userdata)
@@ -305,7 +317,7 @@ int showFrames()
 	cameraPorts[2] = RIGHT_CAM;
 	//cameraPorts[3] = FOUR_CAM;
 	//cameraPorts[4] = FIFTH_CAM;
-	CameraOps *CO = new CameraOps(cameraPorts);
+	CameraOps *CO = new CameraOps(cameraPorts, PREPROCESS_FRAMES_PATH, false);
 	//CO->CO_setProp(CV_CAP_PROP_FRAME_WIDTH, 400);
 	//CO->CO_setProp(CV_CAP_PROP_FRAME_HEIGHT, 300);
 
@@ -441,81 +453,16 @@ int use360Camera()
 
 }
 
-int takePic() {
-
-	std::vector<int> cameraPorts(NO_OF_CAMS);
-	cameraPorts[0] = BASE_CAM;
-	cameraPorts[1] = LEFT_CAM;
-	cameraPorts[2] = RIGHT_CAM;
-	//cameraPorts[3] = FOUR_CAM;
-	//cameraPorts[4] = FIFTH_CAM;
-	CameraOps *CO = new CameraOps(cameraPorts);
-	ImageOps *IO = new ImageOps();
-
-	double Brightness;
-	double Contrast;
-	double Saturation;
-	double Gain;
-
-	Brightness = CO->CO_getProp(CV_CAP_PROP_BRIGHTNESS, 0);
-	Contrast = CO->CO_getProp(CV_CAP_PROP_CONTRAST, 0);
-	Saturation = CO->CO_getProp(CV_CAP_PROP_SATURATION, 0);
-	Gain = CO->CO_getProp(CV_CAP_PROP_GAIN, 0);
-
-	cout << "Brightness: " << Brightness;
-	cout << "Contrast: " << Contrast;
-	cout << "Saturation: " << Saturation;
-	cout << "Gain: " << Gain;
-
-	CO->CO_setProp(CV_CAP_PROP_BRIGHTNESS, Brightness);
-	CO->CO_setProp(CV_CAP_PROP_CONTRAST, Contrast);
-	CO->CO_setProp(CV_CAP_PROP_SATURATION, Saturation);
-	CO->CO_setProp(CV_CAP_PROP_GAIN, Gain);
-
-	int frameWidth = CO->CO_getProp(CV_CAP_PROP_FRAME_WIDTH, 0);
-	int frameHeight = CO->CO_getProp(CV_CAP_PROP_FRAME_HEIGHT, 0);
-
-	// Create blank image for instructions
-	cv::Mat directions_screen = cv::Mat(400, 300, CV_8UC3);
-	directions_screen.setTo(cv::Scalar(0, 0, 0));
-	putText(directions_screen, "Press on SPACE to Snap!", cvPoint(30, 30),
-		FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(0, 140, 255), 1, CV_AA);
-
-	imshow("Directions Screen", directions_screen);
-	
-	while (1)
-	{
-		if (waitKey(30) == ' ')
-		{
-			//directions_screen.setTo(cv::Scalar(255, 255, 180));
-			//putText(directions_screen, "Recording! Press SPACE to stop.", cvPoint(30, 30),
-				//FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(200, 200, 250), 1, CV_AA);
-
-			//imshow("Directions Screen", directions_screen);
-
-			cout << "instantiating memory manager" << endl;
-			MemoryManager *MM = new MemoryManager(NO_OF_CAMS, PREPROCESS_FRAMES_PATH, frameHeight, frameWidth, false);
-			cout << "caputuring frame from sensor" << endl;
-			CO->CO_captureFrames(FRAMES);
-			CO->CO_captureFrames(FRAMES);
-			cout << "memory manager saving frame" << endl;
-			MM->writeStaticFrames(FRAMES, NO_OF_CAMS, camPicPrefix);
-			break;
-		}
-
-	}
-
-	return 1;
-
-}
-
-int testingFunction(bool GPU, bool stitchFromMemory) {
+int testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo) {
 
 	std::string method = "w/o GPU";
 	if (GPU)
 		method = "w GPU";
 
 	cout << "Stitching " + method << endl;
+	cout << "Stitching from memory: " << stitchFromMemory << endl;
+	if (stitchFromMemory)
+		cout << "If stitch from memory, stitch video: " << stitchVideo << endl;
 
 	std::vector<int> cameraPorts(NO_OF_CAMS);
 	cameraPorts[0] = BASE_CAM;
@@ -523,17 +470,16 @@ int testingFunction(bool GPU, bool stitchFromMemory) {
 	cameraPorts[2] = RIGHT_CAM;
 	//cameraPorts[3] = FOUR_CAM;
 	//cameraPorts[4] = FIFTH_CAM;
-	CameraOps *CO = new CameraOps(cameraPorts);
+	CameraOps *CO = new CameraOps(cameraPorts, PREPROCESS_FRAMES_PATH, stitchVideo);
 	ImageOps *IO = new ImageOps();
 	GPUOps *GO = GPU ? new GPUOps(NO_OF_CAMS) : NULL;
 	BlenderOps *BO = new BlenderOps();
+	MemoryManager *MM;
 
 	cv::VideoWriter outputVideo;
 
 	std::vector<cv::Point2f> scene_cornersLeft, scene_cornersRight, scene_cornersBase, scene_cornersFour, scene_cornersFive, scene_cornersSix, scene_corners;
-	//CO->CO_setProp(CV_CAP_PROP_FRAME_WIDTH, 1920);
-	//CO->CO_setProp(CV_CAP_PROP_FRAME_HEIGHT, 1080);
-
+	
 	double Brightness;
 	double Contrast;
 	double Saturation;
@@ -561,8 +507,11 @@ int testingFunction(bool GPU, bool stitchFromMemory) {
 	bool record = false;
 	cout << frameWidth << " " << frameHeight << endl;
 	cv::Mat result = Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
-	MemoryManager *MM = new MemoryManager(NO_OF_CAMS, PREPROCESS_FRAMES_PATH, frameHeight, frameWidth, false);
-
+	if (stitchFromMemory && !stitchVideo)
+		MM = new MemoryManager(NO_OF_CAMS, PREPROCESS_FRAMES_PATH, frameHeight, frameWidth, stitchVideo);
+	if (stitchFromMemory && stitchVideo)
+		MM = new MemoryManager(1, RESULTS_FRAMES_PATH, resultHeight + 1000, resultWidth/2, stitchVideo);
+	
 	// Move Scene to the right by 100
 	int x_offset = 400.0;
 	float y_offset = 100.0;
@@ -704,12 +653,15 @@ int testingFunction(bool GPU, bool stitchFromMemory) {
 		frameNo++;
 		int _startWhileLoop = (int)getTickCount();
 
-		if (stitchFromMemory){
+		if (stitchFromMemory && !stitchVideo){
 			MM->readFrames(FRAMES, camPicPrefix);
 		}
 		else {
 			CO->CO_captureFrames(FRAMES);
 		}
+
+		if (FRAMES[0].empty())
+			break;
 
 		IO->IO_cvtColor(FRAMES, CV_RGB2GRAY);
 		//IO->IO_resize(FRAMES, cv::Size(frameWidth, frameHeight));
@@ -845,11 +797,19 @@ int testingFunction(bool GPU, bool stitchFromMemory) {
 			cv::cvtColor(croppedImage, color_img, CV_GRAY2BGR);
 			putText(color_img , "moment in the orb", cvPoint(20, 30),
 				FONT_HERSHEY_DUPLEX, 0.8, cvScalar(0,144,255),1, CV_AA);
-			imshow("cropped Result", color_img);
-			waitKey(0);
 			ResultFinal[0] = color_img;
-			MM->writeStaticFrames(ResultFinal, 1, preprocess + "/FinalStitchedResult");
-			break;
+			if (!stitchVideo){
+				imshow("cropped Result", color_img);
+				waitKey(0);
+				MM->writeStaticFrames(ResultFinal, 1, preprocess + "/FinalStitchedResult");
+				break;
+			}
+			else {
+				MM->writeVideoFrames(ResultFinal);
+			}
+		}
+		else {
+			imshow("cropped Result", croppedImage);
 		}
 			
 
@@ -879,6 +839,11 @@ int testingFunction(bool GPU, bool stitchFromMemory) {
 		if (waitKey(30) == 27)
 			break;
 	}
+	delete CO;
+	delete MM;
+	delete IO;
+	delete GO;
+	delete BO;
 	return 1;
 }
 
@@ -910,7 +875,7 @@ int stitchLive(bool GPU) {
 	cameraPorts[2] = RIGHT_CAM;
 	cameraPorts[3] = FOUR_CAM;
 	cameraPorts[4] = FIFTH_CAM;
-	CameraOps *CO = new CameraOps(cameraPorts);
+	CameraOps *CO = new CameraOps(cameraPorts, PREPROCESS_FRAMES_PATH, false);
 	ImageOps *IO = new ImageOps();
 	GPUOps *GO = GPU ? new GPUOps(NO_OF_CAMS) : NULL;
 	
@@ -1415,16 +1380,120 @@ int stitchLive(bool GPU) {
 
 }
 
+int takePic() {
+
+	std::vector<int> cameraPorts(NO_OF_CAMS);
+	cameraPorts[0] = BASE_CAM;
+	cameraPorts[1] = LEFT_CAM;
+	cameraPorts[2] = RIGHT_CAM;
+	//cameraPorts[3] = FOUR_CAM;
+	//cameraPorts[4] = FIFTH_CAM;
+	CameraOps *CO = new CameraOps(cameraPorts, PREPROCESS_FRAMES_PATH, false);
+	ImageOps *IO = new ImageOps();
+
+	double Brightness;
+	double Contrast;
+	double Saturation;
+	double Gain;
+
+	Brightness = CO->CO_getProp(CV_CAP_PROP_BRIGHTNESS, 0);
+	Contrast = CO->CO_getProp(CV_CAP_PROP_CONTRAST, 0);
+	Saturation = CO->CO_getProp(CV_CAP_PROP_SATURATION, 0);
+	Gain = CO->CO_getProp(CV_CAP_PROP_GAIN, 0);
+
+	cout << "Brightness: " << Brightness;
+	cout << "Contrast: " << Contrast;
+	cout << "Saturation: " << Saturation;
+	cout << "Gain: " << Gain;
+
+	CO->CO_setProp(CV_CAP_PROP_BRIGHTNESS, Brightness);
+	CO->CO_setProp(CV_CAP_PROP_CONTRAST, Contrast);
+	CO->CO_setProp(CV_CAP_PROP_SATURATION, Saturation);
+	CO->CO_setProp(CV_CAP_PROP_GAIN, Gain);
+
+	int frameWidth = CO->CO_getProp(CV_CAP_PROP_FRAME_WIDTH, 0);
+	int frameHeight = CO->CO_getProp(CV_CAP_PROP_FRAME_HEIGHT, 0);
+
+	// Create blank image for instructions
+	cv::Mat directions_screen = cv::Mat(400, 300, CV_8UC3);
+	directions_screen.setTo(cv::Scalar(0, 0, 0));
+	putText(directions_screen, "Press on SPACE to Snap!", cvPoint(30, 30),
+		FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(0, 140, 255), 1, CV_AA);
+
+	imshow("Directions Screen", directions_screen);
+
+	while (1)
+	{
+		if (waitKey(30) == ' ')
+		{
+			//directions_screen.setTo(cv::Scalar(255, 255, 180));
+			//putText(directions_screen, "Recording! Press SPACE to stop.", cvPoint(30, 30),
+			//FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(200, 200, 250), 1, CV_AA);
+
+			//imshow("Directions Screen", directions_screen);
+
+			cout << "instantiating memory manager" << endl;
+			MemoryManager *MM = new MemoryManager(NO_OF_CAMS, PREPROCESS_FRAMES_PATH, frameHeight, frameWidth, false);
+			cout << "caputuring frame from sensor" << endl;
+			CO->CO_captureFrames(FRAMES);
+			CO->CO_captureFrames(FRAMES);
+			cout << "memory manager saving frame" << endl;
+			MM->writeStaticFrames(FRAMES, NO_OF_CAMS, camPicPrefix);
+			break;
+		}
+
+	}
+
+	return 1;
+
+}
 
 int record()
 {
+
+	std::vector<int> cameraPorts(NO_OF_CAMS);
+	cameraPorts[0] = BASE_CAM;
+	cameraPorts[1] = LEFT_CAM;
+	cameraPorts[2] = RIGHT_CAM;
+	//cameraPorts[3] = FOUR_CAM;
+	//cameraPorts[4] = FIFTH_CAM;
+	CameraOps *CO = new CameraOps(cameraPorts, PREPROCESS_FRAMES_PATH, false);
+
+	double Brightness;
+	double Contrast;
+	double Saturation;
+	double Gain;
+
+	Brightness = CO->CO_getProp(CV_CAP_PROP_BRIGHTNESS, 0);
+	Contrast = CO->CO_getProp(CV_CAP_PROP_CONTRAST, 0);
+	Saturation = CO->CO_getProp(CV_CAP_PROP_SATURATION, 0);
+	Gain = CO->CO_getProp(CV_CAP_PROP_GAIN, 0);
+
+	cout << "Brightness: " << Brightness;
+	cout << "Contrast: " << Contrast;
+	cout << "Saturation: " << Saturation;
+	cout << "Gain: " << Gain;
+
+	CO->CO_setProp(CV_CAP_PROP_BRIGHTNESS, Brightness);
+	CO->CO_setProp(CV_CAP_PROP_CONTRAST, Contrast);
+	CO->CO_setProp(CV_CAP_PROP_SATURATION, Saturation);
+	CO->CO_setProp(CV_CAP_PROP_GAIN, Gain);
+
+	int frameWidth = CO->CO_getProp(CV_CAP_PROP_FRAME_WIDTH, 0);
+	int frameHeight = CO->CO_getProp(CV_CAP_PROP_FRAME_HEIGHT, 0);
+
+	cout << PREPROCESS_FRAMES_PATH[0] << endl;
+
+	MemoryManager *MM = new MemoryManager(NO_OF_CAMS, PREPROCESS_FRAMES_PATH, 640, 480, true);
+
 	// Create blank image for instructions
 	cv::Mat directions_screen = cv::Mat(400, 300, CV_8UC3);
-	directions_screen.setTo(cv::Scalar(130, 120, 180));
+	directions_screen.setTo(cv::Scalar(0, 0, 0));
 	putText(directions_screen, "Press on SPACE to Record!", cvPoint(30, 30),
-		FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(200, 200, 250), 1, CV_AA);
+		FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(0, 140, 255), 1, CV_AA);
 
 	imshow("Directions Screen", directions_screen);
+
 	while (1)
 	{
 		if (waitKey(30) == ' ')
@@ -1435,55 +1504,10 @@ int record()
 
 			imshow("Directions Screen", directions_screen);
 
-			std::vector<int> cameraPorts(NO_OF_CAMS);
-			cameraPorts[0] = BASE_CAM;
-			cameraPorts[1] = LEFT_CAM;
-			cameraPorts[2] = RIGHT_CAM;
-			cameraPorts[3] = FOUR_CAM;
-			cameraPorts[4] = FIFTH_CAM;
-			CameraOps *CO = new CameraOps(cameraPorts);
-			ImageOps *IO = new ImageOps();
-
-			std::vector<cv::Point2f> scene_cornersLeft, scene_cornersRight, scene_cornersBase, scene_cornersFour, scene_cornersFive, scene_cornersSix, scene_corners;
-			CO->CO_setProp(CV_CAP_PROP_FRAME_WIDTH, 1920);
-			CO->CO_setProp(CV_CAP_PROP_FRAME_HEIGHT, 1080);
-
-			double Brightness;
-			double Contrast;
-			double Saturation;
-			double Gain;
-
-			Brightness = CO->CO_getProp(CV_CAP_PROP_BRIGHTNESS, 0);
-			Contrast = CO->CO_getProp(CV_CAP_PROP_CONTRAST, 0);
-			Saturation = CO->CO_getProp(CV_CAP_PROP_SATURATION, 0);
-			Gain = CO->CO_getProp(CV_CAP_PROP_GAIN, 0);
-
-			cout << "Brightness: " << Brightness;
-			cout << "Contrast: " << Contrast;
-			cout << "Saturation: " << Saturation;
-			cout << "Gain: " << Gain;
-
-			CO->CO_setProp(CV_CAP_PROP_BRIGHTNESS, Brightness);
-			CO->CO_setProp(CV_CAP_PROP_CONTRAST, Contrast);
-			CO->CO_setProp(CV_CAP_PROP_SATURATION, Saturation);
-			CO->CO_setProp(CV_CAP_PROP_GAIN, Gain);
-
-			int frameWidth = CO->CO_getProp(CV_CAP_PROP_FRAME_WIDTH, 0)*0.25;
-			int frameHeight = CO->CO_getProp(CV_CAP_PROP_FRAME_HEIGHT, 0)*0.25;
-			
-			MemoryManager *MM = new MemoryManager(NO_OF_CAMS, PREPROCESS_FRAMES_PATH, frameHeight, frameWidth, true);
-
 			while (1)
 			{
 				CO->CO_captureFrames(FRAMES);
-
 				MM->writeVideoFrames(FRAMES);
-
-				imshow("Base", FRAMES[0]);
-				imshow("Left", FRAMES[1]);
-				imshow("Right", FRAMES[2]);
-				imshow("Four", FRAMES[3]);
-				imshow("Five", FRAMES[4]);
 
 				if (waitKey(30) == ' ')
 					break;
@@ -1493,8 +1517,67 @@ int record()
 
 	}
 
+	delete CO;
+	delete MM;
+
 	return 1;
 }
+
+//int main()
+//{
+//
+//	setup();
+//	std::vector<int> cameraPorts(NO_OF_CAMS);
+//	cameraPorts[0] = BASE_CAM;
+//	cameraPorts[1] = LEFT_CAM;
+//	cameraPorts[2] = RIGHT_CAM;
+//	//cameraPorts[3] = FOUR_CAM;
+//	//cameraPorts[4] = FIFTH_CAM;
+//	CameraOps *CO = new CameraOps(cameraPorts);
+//	VideoCapture inputVideo(0);              // Open input
+//	if (!inputVideo.isOpened())
+//	{
+//		cout << "Could not open the input video: " << "0" << endl;
+//		return -1;
+//	}
+//
+//	cv::Size S = cv::Size((int)inputVideo.get(CV_CAP_PROP_FRAME_WIDTH),    // Acquire input size
+//		(int)inputVideo.get(CV_CAP_PROP_FRAME_HEIGHT));
+//
+//	VideoWriter outputVideoB, outputVideoL, outputVideoR;
+//	std::vector<cv::VideoWriter> writers(3); // Open the output
+//	writers[0] = outputVideoB;
+//	writers[1] = outputVideoL;
+//	writers[2] = outputVideoR;
+//
+//	std::string filePath = "samples/preprocess/sampleVideo.avi";
+//	std::string filePath1 = "samples/preprocess/sampleVideo1.avi";
+//	std::string filePath2 = "samples/preprocess/sampleVideo2.avi";
+//
+//	cout << PREPROCESS_FRAMES_PATH[0] << endl;
+//	writers[0].open(filePath, -1, 20, cv::Size(640, 480), true);
+//	writers[1].open(filePath1, -1, 20, cv::Size(640, 480), true);
+//	writers[2].open(filePath2, -1, 20, cv::Size(640, 480), true);
+//
+//	
+//	cv::Mat src;
+//	for (;;) //Show the image captured in the window and repeat
+//	{
+//		CO->CO_captureFrames(FRAMES);
+//
+//		imshow("src", FRAMES[0]);
+//		writers[0] << FRAMES[0];
+//		writers[1] << FRAMES[1];
+//		writers[2] << FRAMES[2];
+//
+//		if (waitKey(30) == ' ')
+//			break;
+//	}
+//
+//	cout << "Finished writing" << endl;
+//	delete CO;
+//	return 0;
+//}
 
 int stitch()
 {
@@ -1690,7 +1773,7 @@ int stitch()
 	outSixFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
 	cv::gpu::Stream streamL, streamR, streamB, stream4, stream5, stream6;
 
-	outputVideo.open(camResultOutput, -1, 30, cv::Size(croppedWidth, croppedHeight), true);
+	outputVideo.open(camResultOutput, -1, 30, cv::Size(croppedWidth, croppedHeight),true);
 
 	//Start processing
 	while (1)

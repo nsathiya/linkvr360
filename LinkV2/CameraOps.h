@@ -18,7 +18,7 @@
 class CameraOps
 {
 public:
-	CameraOps(std::vector<int> cameraPoints);
+	CameraOps(std::vector<int> cameraPorts, std::vector<std::string> videoPorts, bool VIDEO);
 	~CameraOps();
 	void CO_setProp(int prop, double value);
 	double CO_getProp(int prop, int camera);

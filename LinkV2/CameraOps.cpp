@@ -1,12 +1,19 @@
 #include "CameraOps.h"
 
 
-CameraOps::CameraOps(std::vector<int> cameraPorts)
+CameraOps::CameraOps(std::vector<int> cameraPorts, std::vector<std::string> videoPorts, bool VIDEO)
 {
 	
-	for (auto i = 0; i < cameraPorts.size(); i++) {
-		cv::VideoCapture newCamera(cameraPorts[i]);
-		cameraArray.push_back(newCamera);
+	if (VIDEO){
+		for (auto i = 0; i < videoPorts.size(); i++) {
+			cv::VideoCapture newCamera(videoPorts[i]);
+			cameraArray.push_back(newCamera);
+		}
+	} else {
+		for (auto i = 0; i < cameraPorts.size(); i++) {
+			cv::VideoCapture newCamera(cameraPorts[i]);
+			cameraArray.push_back(newCamera);
+		}
 	}
 }
 
