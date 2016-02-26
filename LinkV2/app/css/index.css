@@ -1,0 +1,87 @@
+html,
+body {
+    -webkit-app-region: drag; 
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  	font-size: 14px;
+  	color: #E59400;
+  	background: #474747;
+    height: 725px;
+    width:800px;
+    overflow: hidden;
+    -webkit-user-select: none;
+}
+
+.close {
+    cursor: pointer;
+    display: inline-block;
+    height: 32px;
+    position: absolute;
+    top: 6px;
+    width: 32px;
+    z-index: 1;
+
+    -webkit-app-region: no-drag;
+}
+
+.stitchButton{
+	cursor: pointer;
+	-webkit-app-region: no-drag;
+    background-color: #f44336;
+    border-radius: 8px;    
+    border: 2px solid #f44336;
+    color: #474747;
+    padding: 15px 32px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 18px;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    transition-duration: 0.4s;
+}
+
+.downloadButton{
+    cursor: pointer;
+    -webkit-app-region: no-drag;
+    background-color: #f44336;
+    border-radius: 8px;    
+    border: 2px solid #f44336;
+    color: #474747;
+    padding: 15px 32px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 18px;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    transition-duration: 0.4s;
+}
+
+
+.stitchButton:hover {
+    background-color: #8C1717;
+    color:#f44336;
+}
+
+.downloadButton:hover {
+    background-color: #8C1717;
+    color:#f44336;
+}
+
+.image1 {
+    height:150px;
+    width:200px;
+}
+
+.image2 {
+    height:150px;
+    width:200px;
+}
+
+.image3 {
+    height:150px;
+    width:200px;
+}
+
+.result {
+    height:150px;
+    width:500px;
+}
