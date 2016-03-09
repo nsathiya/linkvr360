@@ -1,0 +1,6 @@
+%YAML:1.0
+Intrinsic Matrix: !!opencv-matrix
+   rows: 3
+   cols: 3
+   dt: f
+   data: [ .Nan, .Nan, .Nan, 0., .Nan, .Nan, 0., 0., 1. ]

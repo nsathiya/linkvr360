@@ -16,7 +16,7 @@
 #include <opencv2/highgui/highgui_c.h>
 #include "opencv2/imgproc/imgproc_c.h"
 #include "opencv2/nonfree/nonfree.hpp"
-
+#include <math.h>
 #include "ImageOps.h"
 #include "CameraOps.h"
 #include "GPUOps.h"
@@ -103,7 +103,7 @@ int main() {
 		"Press 'r' to Snap. \n"
 		"Press 'c' to Record. \n"
 		"Press 'f' to Show Test Frames.\n"
-		"Press 'c' for External Calibration.\n"
+		"Press 'e' for External Calibration.\n"
 		"Press 'i' for Internal Calibration.\n"
 		"Press 'g' for B&W/Color mode switching.\n Current mode is Color. \n"
 		"Press 't' for testing function.\n";
@@ -142,14 +142,14 @@ int main() {
 			if (showFrames() == 1)
 				return 0;
 		}
-		else if (optionSelected == 'c')
+		else if (optionSelected == 'e')
 		{
 			if (calibrateCamerasExternal(BASE_CAM, RIGHT_CAM) == 1)
 				return 0;
 		}
 		else if (optionSelected == 'i')
 		{
-			if (calibrateCamerasInternal(RIGHT_CAM) == 1)
+			if (calibrateCamerasInternal(BASE_CAM) == 1)
 				return 0;
 		}
 		else if (optionSelected == 'g') {
@@ -158,7 +158,7 @@ int main() {
 			std::cout << "Color Mode is " << (useGrayScale ? "B&W" : "Color") << std::endl;
 		}
 		else if (optionSelected == 't') {
-			if (testingFunction(true, true, true) == 1)
+			if (testingFunction(false,false, false) == 1)
 				return 0;
 		}
 	}
@@ -169,8 +169,8 @@ int main() {
 void setup()
 {
 
-	FOCAL[0] = CAM_F_MAP[BASE_CAM] = 395.164;
-	FOCAL[1] = CAM_F_MAP[LEFT_CAM] = 422.400;
+	FOCAL[0] = CAM_F_MAP[BASE_CAM] = 551.164;
+	FOCAL[1] = CAM_F_MAP[LEFT_CAM] = 551.400;
 	FOCAL[2] = CAM_F_MAP[RIGHT_CAM] = 326.38;
 	//FOCAL[3] = CAM_F_MAP[FOUR_CAM] = 176.9511;
 	//FOCAL[4] = CAM_F_MAP[FIFTH_CAM] = 175.2695;
@@ -318,9 +318,7 @@ int showFrames()
 	//cameraPorts[3] = FOUR_CAM;
 	//cameraPorts[4] = FIFTH_CAM;
 	CameraOps *CO = new CameraOps(cameraPorts, PREPROCESS_FRAMES_PATH, false);
-	//CO->CO_setProp(CV_CAP_PROP_FRAME_WIDTH, 400);
-	//CO->CO_setProp(CV_CAP_PROP_FRAME_HEIGHT, 300);
-
+	
 	double Brightness;
 	double Contrast;
 	double Saturation;
@@ -340,23 +338,76 @@ int showFrames()
 	CO->CO_setProp(CV_CAP_PROP_CONTRAST, Contrast);
 	CO->CO_setProp(CV_CAP_PROP_SATURATION, Saturation);
 	CO->CO_setProp(CV_CAP_PROP_GAIN, Gain);
+	CO->CO_setProp(CV_CAP_PROP_FRAME_WIDTH, 1640);
+	CO->CO_setProp(CV_CAP_PROP_FRAME_HEIGHT, 1080);
 
 	int frameWidth = CO->CO_getProp(CV_CAP_PROP_FRAME_WIDTH, 0);//*0.25;
 	int frameHeight = CO->CO_getProp(CV_CAP_PROP_FRAME_HEIGHT, 0);//*0.25;
 	cv::Mat leftFrame, rightFrame, fourFrame, fifthFrame, sixFrame;
 
 	cout << frameWidth << " " << frameHeight << endl;
+	//namedWindow("base Frame", WINDOW_AUTOSIZE);// Create a window for display.
+	//namedWindow("left Frame", WINDOW_AUTOSIZE);// Create a window for display.
+	//namedWindow("right Frame", WINDOW_AUTOSIZE);// Create a window for display.
+
 	while (1)
 	{
 
 		CO->CO_captureFrames(FRAMES);
+		cv::Mat imageUndistorted, imageUndistorted1;
+		cout << INTRINSICCOEFFS[0] << endl;
+		cv::Matx33d newK1 = INTRINSICCOEFFS[0];
+		newK1(0, 0) =100;
+		newK1(1, 1) =100;
+		cv::Matx33d newK2 = INTRINSICCOEFFS[1];
+		newK2(0, 0) =100;
+		newK2(1, 1) =100;
+
+		//cout << image.depth() << endl;
+		//cout << imageUndistorted.depth() << endl;
+		//cout << CV_32F << endl;
+		//cout << CV_64F << endl;
+		//double balance = 1.0;
+		//cv::fisheye::estimateNewCameraMatrixForUndistortRectify(INTRINSICCOEFFS[0],DISTORTIONCOEFFS[0], FRAMES[0].size(), cv::noArray(), newK, balance);
+		//cout << FRAMES[0].cols << FRAMES[0].rows << endl;
+		//cv::fisheye::undistortImage(FRAMES[0], imageUndistorted, INTRINSICCOEFFS[1], DISTORTIONCOEFFS[1], newK1);
+		//cv::fisheye::undistortImage(FRAMES[1], imageUndistorted1, INTRINSICCOEFFS[1], DISTORTIONCOEFFS[1], newK2);
+
+		
+		cv::resize(FRAMES[0], FRAMES[0], cv::Size(900, 500));
+		cv::resize(FRAMES[1], FRAMES[1], cv::Size(900, 500));
+		cv::Rect myROI(50, 0, 800, 500), myROI2(150,150, 500, 500);
+		
+		cv::Mat row1 = cv::Mat::ones(150, 800, FRAMES[0].type());  // 3 cols
+		cv::Mat row2 = cv::Mat::ones(150, 800, FRAMES[0].type());  // 3 cols
+		cv::Mat croppedImageB, croppedImageL;
+
+		croppedImageB.push_back(row1);
+		croppedImageL.push_back(row1);
+		croppedImageB.push_back(FRAMES[0](myROI));
+		croppedImageL.push_back(FRAMES[1](myROI));
+		croppedImageB.push_back(row1);
+		croppedImageL.push_back(row1);
+
+		imshow("before rectilinear - B", croppedImageB);
+		imshow("before rectilinear - L", croppedImageL);
+
+		cv::Mat rectLinearBaseFrame = rectlinearProject(croppedImageB, 0,40);
+		cv::Mat rectLinearRightFrame = rectlinearProject(croppedImageL, 0, 90);
 
 		if (waitKey(100) == 110)
 			break;
+		rectLinearBaseFrame = rectLinearBaseFrame(myROI2);
+		rectLinearRightFrame = rectLinearRightFrame(myROI2);
+		//cv::resize(rectLinearBaseFrame, rectLinearBaseFrame, cv::Size(1200,1000));
+		//cv::resize(rectLinearRightFrame, rectLinearRightFrame, cv::Size(1200, 1000));
 
-		imshow("base Frame",  FRAMES[0]);
-		imshow("left Frame",  FRAMES[1]);
-		imshow("right Frame", FRAMES[2]);
+		//cout << rectLinearBaseFrame << endl;
+		imshow("base Frame", rectLinearBaseFrame);
+		imshow("left Frame", rectLinearRightFrame);
+
+		//imshow("left Frame",  FRAMES[1]);
+		//imshow("right Frame", FRAMES[2]);
 		//imshow("four Frame",  FRAMES[3]);
 		//imshow("five Frame",  FRAMES[4]);*/
 		//imshow("sixth Frame", sixFrame);
@@ -387,8 +438,9 @@ cv::Mat rectlinearProject(Mat ImgToCalibrate, bool INV_FLAG, float F)
 	Mat Img = ImgToCalibrate;
 	int height = Img.rows;
 	int width = Img.cols;
-	Mat destPic = Mat(cv::Size(width, height), ImgToCalibrate.type());
-	std::cout << "rect linear " << ImgToCalibrate.type() << " " << CV_8UC3 << " " << CV_8UC1 << " " << CV_8UC4 << std::endl;
+	Mat destPic = Mat(cv::Size(width, height), ImgToCalibrate.type(), cv::Scalar(0,0,0));
+
+	cout << width << height << endl;
 	for (int y = 0; y < height; y++)
 	{
 		for (int x = 0; x < width; x++)
@@ -407,7 +459,8 @@ cv::Mat rectlinearProject(Mat ImgToCalibrate, bool INV_FLAG, float F)
 				continue;
 			}
 			if (destPic.type() == CV_8UC1) {
-				interpolateBilinear(Img, current_pos, top_left, destPic.at<uchar>(y, x));
+				destPic.at<uchar>(y, x) = Img.at<uchar>(top_left.y, top_left.x);
+				//interpolateBilinear(Img, current_pos, top_left, destPic.at<uchar>(y, x));
 			}
 			else {//JH: added color pixels
 				interpolateBilinear(Img, current_pos, top_left, destPic.at<cv::Vec3b>(y, x));
@@ -418,15 +471,62 @@ cv::Mat rectlinearProject(Mat ImgToCalibrate, bool INV_FLAG, float F)
 	return destPic;
 }
 
+//cv::Point2f convert_pt(cv::Point2f point, int w, int h, int INV_FLAG, float F)
+//{
+//	//center the point at 0,0
+//	cv::Point2f pc(point.x - w / 2, point.y - h / 2);
+//	float f, r;
+//	if (INV_FLAG == 0)
+//	{
+//		f = -F;
+//		r = w + 1000;
+//	}
+//	else
+//	{
+//		f = 1;
+//		r = 1;
+//	}
+//	float omega = w / 2;
+//	float z0 = f - sqrt(r*r - omega*omega);
+//
+//	float zc = (2 * z0 + sqrt(4 * z0*z0 - 4 * (pc.x*pc.x / (f*f) + 1)*(z0*z0 - r*r))) / (2 * (pc.x*pc.x / (f*f) + 1));
+//	cv::Point2f final_point(pc.x*zc / f, pc.y*zc / f);
+//	final_point.x += w / 2;
+//	final_point.y += h / 2;
+//	return final_point;
+//}
+
 cv::Point2f convert_pt(cv::Point2f point, int w, int h, int INV_FLAG, float F)
 {
+
 	//center the point at 0,0
-	cv::Point2f pc(point.x - w / 2, point.y - h / 2);
+	float FOV = 3.2;
+	// Polar angles
+	//cv::Point2f pc(point.x - w / 2, point.y - h / 2);
+	float theta = 2.0 * 3.14159265 * (point.x / w - 0.5); // -pi to pi
+	float phi = 3.14159265 * (point.y / h - 0.5);	// -pi/2 to pi/2
+	
+	// Vector in 3D space
+	float x = cos(phi) * sin(theta);
+	float y = cos(phi) * cos(theta);
+	float z = sin(phi);
+
+	// Calculate fisheye angle and radius
+	theta = atan2(z, x);
+	phi = atan2(sqrt(x*x + z*z), y);
+	float r = w * phi / FOV;
+	// Pixel in fisheye space
+	cv::Point2f rP;
+	rP.x =  0.5 * w + r * cos(theta);
+	rP.y =	0.5 * w + r * sin(theta);
+
+	/*cv::Point2f pc(point.x - w / 2, point.y - h / 2);
+
 	float f, r;
 	if (INV_FLAG == 0)
 	{
 		f = -F;
-		r = w + 25;
+		r = w + 1000;
 	}
 	else
 	{
@@ -440,9 +540,10 @@ cv::Point2f convert_pt(cv::Point2f point, int w, int h, int INV_FLAG, float F)
 	cv::Point2f final_point(pc.x*zc / f, pc.y*zc / f);
 	final_point.x += w / 2;
 	final_point.y += h / 2;
-	return final_point;
-}
+	*/
 
+	return rP;
+}
 
 int use360Camera()
 {
@@ -499,6 +600,9 @@ int testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo) {
 	CO->CO_setProp(CV_CAP_PROP_CONTRAST, Contrast);
 	CO->CO_setProp(CV_CAP_PROP_SATURATION, Saturation);
 	CO->CO_setProp(CV_CAP_PROP_GAIN, Gain);
+	CO->CO_setProp(CV_CAP_PROP_FRAME_WIDTH, 1640);
+	CO->CO_setProp(CV_CAP_PROP_FRAME_HEIGHT, 1080);
+
 
 	int frameWidth = CO->CO_getProp(CV_CAP_PROP_FRAME_WIDTH, 0); // *0.25;
 	int frameHeight = CO->CO_getProp(CV_CAP_PROP_FRAME_HEIGHT, 0); // *0.25;
@@ -541,7 +645,23 @@ int testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo) {
 	//IO->IO_resize(FRAMES, cv::Size(frameWidth, frameHeight));
 	//IO->IO_transpose(FRAMES);
 	//IO->IO_flip(FRAMES, 1);
-	IO->IO_undistort(FRAMES, INTRINSICCOEFFS, DISTORTIONCOEFFS);
+	//IO->IO_undistort(FRAMES, INTRINSICCOEFFS, DISTORTIONCOEFFS);
+
+	cv::Matx33d newK1 = INTRINSICCOEFFS[0];
+	newK1(0, 0) = 200;
+	newK1(1, 1) = 300;
+	cv::Matx33d newK2 = INTRINSICCOEFFS[1];
+	newK2(0, 0) = 200;
+	newK2(1, 1) = 300;
+
+	//cout << image.depth() << endl;
+	//cout << imageUndistorted.depth() << endl;
+	//cout << CV_32F << endl;
+	//cout << CV_64F << endl;
+	//double balance = 1.0;
+	//cv::fisheye::estimateNewCameraMatrixForUndistortRectify(INTRINSICCOEFFS[0],DISTORTIONCOEFFS[0], FRAMES[0].size(), cv::noArray(), newK, balance);
+	cv::fisheye::undistortImage(FRAMES[0], FRAMES[0], INTRINSICCOEFFS[0], DISTORTIONCOEFFS[0], newK1);
+	cv::fisheye::undistortImage(FRAMES[1], FRAMES[1], INTRINSICCOEFFS[1], DISTORTIONCOEFFS[1], newK2);
 
 	// Use the Homography Matrix to warp the images
 	scene_corners.clear();
@@ -553,10 +673,11 @@ int testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo) {
 	scene_cornersLeft.push_back(Point2f(FRAMES[1].cols, 0.0));
 	scene_cornersLeft.push_back(Point2f(0.0, FRAMES[1].rows));
 	scene_cornersLeft.push_back(Point2f(FRAMES[1].cols, FRAMES[1].rows));
-	/*scene_cornersRight.push_back(Point2f(0.0, 0.0));
+	scene_cornersRight.push_back(Point2f(0.0, 0.0));
 	scene_cornersRight.push_back(Point2f(FRAMES[2].cols, 0.0));
 	scene_cornersRight.push_back(Point2f(0.0, FRAMES[2].rows));
 	scene_cornersRight.push_back(Point2f(FRAMES[2].cols, FRAMES[2].rows));
+	/*
 	scene_cornersFour.push_back(Point2f(0.0, 0.0));
 	scene_cornersFour.push_back(Point2f(FRAMES[3].cols, 0.0));
 	scene_cornersFour.push_back(Point2f(0.0, FRAMES[3].rows));
@@ -571,8 +692,8 @@ int testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo) {
 	//scene_cornersSix.push_back(Point2f(sixFrame.cols, sixFrame.rows));
 
 	perspectiveTransform(scene_cornersBase, scene_cornersBase, trans);
-	perspectiveTransform(scene_cornersLeft, scene_cornersLeft, HL);/*
-	perspectiveTransform(scene_cornersRight, scene_cornersRight, HR);
+	perspectiveTransform(scene_cornersLeft, scene_cornersLeft, HL);
+	perspectiveTransform(scene_cornersRight, scene_cornersRight, HR);/*
 	perspectiveTransform(scene_cornersFour, scene_cornersFour, H4);
 	perspectiveTransform(scene_cornersFive, scene_cornersFive, H5);*/
 	//perspectiveTransform(scene_cornersSix, scene_cornersSix, H6);
@@ -657,18 +778,71 @@ int testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo) {
 			MM->readFrames(FRAMES, camPicPrefix);
 		}
 		else {
+			cout << "capturing frames" << endl;
 			CO->CO_captureFrames(FRAMES);
 		}
+		//imshow("base frame", FRAMES[0]);
+		//imshow("left frame", FRAMES[1]);
+		//imshow("right frame", FRAMES[2]);
 
+		//cv::waitKey(0);
 		if (FRAMES[0].empty())
 			break;
 
 		IO->IO_cvtColor(FRAMES, CV_RGB2GRAY);
+		//imshow("base frame", FRAMES[0]);
+		//imshow("left frame", FRAMES[1]);
+		//imshow("right frame", FRAMES[2]);
+
+		//cv::waitKey(0);
 		//IO->IO_resize(FRAMES, cv::Size(frameWidth, frameHeight));
 		//IO->IO_transpose(FRAMES);
 		//IO->IO_flip(FRAMES, 1);
-		IO->IO_undistort(FRAMES, INTRINSICCOEFFS, DISTORTIONCOEFFS);
-		IO->IO_rectilinearProject(FRAMES, 0, FOCAL);
+		//IO->IO_undistort(FRAMES, INTRINSICCOEFFS, DISTORTIONCOEFFS);
+		
+		cv::Matx33d newK1 = INTRINSICCOEFFS[0];
+		newK1(0, 0) = 200;
+		newK1(1, 1) = 300;
+		cv::Matx33d newK2 = INTRINSICCOEFFS[1];
+		newK2(0, 0) = 200;
+		newK2(1, 1) = 300;
+
+		//cout << image.depth() << endl;
+		//cout << imageUndistorted.depth() << endl;
+		//cout << CV_32F << endl;
+		//cout << CV_64F << endl;
+		//double balance = 1.0;
+		//cv::fisheye::estimateNewCameraMatrixForUndistortRectify(INTRINSICCOEFFS[0],DISTORTIONCOEFFS[0], FRAMES[0].size(), cv::noArray(), newK, balance);
+		//cv::fisheye::undistortImage(FRAMES[0], FRAMES[0], INTRINSICCOEFFS[0], DISTORTIONCOEFFS[0], newK1);
+		//cv::fisheye::undistortImage(FRAMES[1], FRAMES[1], INTRINSICCOEFFS[1], DISTORTIONCOEFFS[1], newK2);
+
+		cv::resize(FRAMES[0], FRAMES[0], cv::Size(1000, 800));
+		cv::resize(FRAMES[1], FRAMES[1], cv::Size(1000, 800));
+		cv::resize(FRAMES[2], FRAMES[2], cv::Size(1000, 800));
+
+		cv::Rect myROI(100, 0, 800, 800);
+
+		cv::Mat croppedImageB = FRAMES[0](myROI);
+		cv::Mat croppedImageL = FRAMES[1](myROI);
+		cv::Mat croppedImageR = FRAMES[2](myROI);
+
+		cv::Mat rectLinearBaseFrame = rectlinearProject(croppedImageB, 0, 90);
+		cv::Mat	rectLinearLeftFrame = rectlinearProject(croppedImageL, 0, 90);
+		cv::Mat	rectLinearRightFrame = rectlinearProject(croppedImageR, 0, 90);
+
+		//imshow("base Frame", rectLinearBaseFrame);
+		//imshow("left Frame", rectLinearRightFrame);
+
+		FRAMES[0] = rectLinearBaseFrame;
+		FRAMES[1] = rectLinearLeftFrame;
+		FRAMES[2] = rectLinearRightFrame;
+
+		//imshow("base frame", FRAMES[0]);
+		//imshow("left frame", FRAMES[1]);
+		//imshow("right frame", FRAMES[2]);
+
+		//cv::waitKey(0);
+		//IO->IO_rectilinearProject(FRAMES, 0, FOCAL);
 		if (GPU){
 			GO->GO_uploadStream(FRAMES);
 			GO->GO_warpPerspective(EXTRINSICCOEFFS, resultHeight+1000, resultWidth);
@@ -679,7 +853,12 @@ int testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo) {
 		}
 		//MM->writeStaticFrames(RESULTS, 1, "WarpPerspective()");
 		
+		//imshow("base frame", RESULTS[0]);
+		//imshow("left frame", RESULTS[1]);
+		//imshow("right frame", RESULTS[2]);
 
+		//cv::waitKey(0);
+		
 		if (frameNo == 1){
 			
 			//BLENDING TEST
@@ -2194,7 +2373,7 @@ int stitch()
 
 int calibrateCamerasInternal(int cam)
 {
-	int numBoards = 20;
+	int numBoards = 10;
 	int numCornersHor = 9;
 	int numCornersVer = 6;
 	int cameraID = cam;
@@ -2206,13 +2385,13 @@ int calibrateCamerasInternal(int cam)
 
 	VideoCapture capture = VideoCapture(cameraID);
 
-	//capture.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
-	//capture.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
+	capture.set(CV_CAP_PROP_FRAME_WIDTH, 1640);
+	capture.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
 	cameraResolutionWidth = capture.get(CV_CAP_PROP_FRAME_WIDTH); // *0.25;
 	cameraResolutionHeight = capture.get(CV_CAP_PROP_FRAME_HEIGHT); // *0.25;
 	//capture.set(CV_CAP_PROP_FRAME_WIDTH, cameraResolutionWidth);
 	//capture.set(CV_CAP_PROP_FRAME_HEIGHT, cameraResolutionHeight);
-	cout << "camera resolution [width height] is " << capture.get(CV_CAP_PROP_FRAME_WIDTH) << " and " << capture.get(CV_CAP_PROP_FRAME_HEIGHT) << endl;
+	cout << "camera resolution [width height] is " << cameraResolutionWidth << " and " << cameraResolutionHeight << endl;
 
 	vector<vector<Point3f>> object_points;
 	vector<vector<Point2f>> image_points;
@@ -2228,7 +2407,7 @@ int calibrateCamerasInternal(int cam)
 	vector<Point3f> obj;
 	for (int j = 0; j<numSquares; j++)
 		obj.push_back(Point3f(j / numCornersHor, j%numCornersHor, 0.0f));
-
+	std::cout << image.size() << std::endl;
 	while (successes<numBoards)
 	{
 
@@ -2261,9 +2440,10 @@ int calibrateCamerasInternal(int cam)
 			image_points.push_back(corners);
 			object_points.push_back(obj);
 
-			printf("Snap stored!");
-
 			successes++;
+
+			printf("Snap stored! picture \n");
+			std::cout << successes << std::endl;
 
 			if (successes >= numBoards)
 				break;
@@ -2271,30 +2451,52 @@ int calibrateCamerasInternal(int cam)
 
 	}
 
-	Mat intrinsic = Mat(3, 3, CV_32FC1);
-	Mat distCoeffs;
-	vector<Mat> rvecs;
-	vector<Mat> tvecs;
-	intrinsic.ptr<float>(0)[0] = 1;
-	intrinsic.ptr<float>(1)[1] = 1;
+	//cv::FileStorage file;
+	//file.open("imagepoints.txt", cv::FileStorage::WRITE);
+	//file << "Image_points" << cv::Mat(image_points);
+	cout << image_points[0] << endl;
 
-	calibrateCamera(object_points, image_points, image.size(), intrinsic, distCoeffs, rvecs, tvecs);
+	//Mat intrinsic = Mat(3, 3, CV_32FC1);
+	//Mat distCoeffs;
+	vector<cv::Vec3d> rvecs;
+	vector<cv::Vec3d> tvecs;
+
+	//vector<Mat> tvecs;
+	//intrinsic.ptr<float>(0)[0] = 1;
+	//intrinsic.ptr<float>(1)[1] = 1;
+
+	//calibrateCamera(object_points, image_points, image.size(), intrinsic, distCoeffs, rvecs, tvecs);
+	//cv::fisheye::calibrate(object_points, image_points, image.size(), intrinsic, distCoeffs, rvecs, tvecs);
+
+	cv::Matx33d intrinsic;
+	cv::Vec4d distCoeffs;
+
+	int flag = 0;
+	flag |= cv::fisheye::CALIB_RECOMPUTE_EXTRINSIC;
+	flag |= cv::fisheye::CALIB_CHECK_COND;
+	flag |= cv::fisheye::CALIB_FIX_SKEW;
+
+	cv::Matx33d theK;
+	cv::Vec4d theD;
+
+	cv::fisheye::calibrate(object_points, image_points, image.size(), intrinsic, distCoeffs,
+		cv::noArray(), cv::noArray(), flag, cv::TermCriteria(3, 20, 1e-6));
 
 	if (cameraID == BASE_CAM)
 	{
 		cout << "saving to base" << endl;
 		cv::FileStorage file;
 		file.open("intrinsic-base.txt", cv::FileStorage::WRITE);
-		file << "Intrinsic Matrix" << intrinsic;
+		file << "Intrinsic Matrix" << cv::Mat(intrinsic);
 		file.open("distortion-base.txt", cv::FileStorage::WRITE);
-		file << "Distortion Matrix" << distCoeffs;
+		file << "Distortion Matrix" << cv::Mat(distCoeffs);
 	}
 	else if (cameraID == RIGHT_CAM)
 	{
 		cout << "saving to right" << endl;
 		cv::FileStorage file;
 		file.open("intrinsic-right.txt", cv::FileStorage::WRITE);
-		file << "Intrinsic Matrix" << intrinsic;
+		//file << "Intrinsic Matrix" << intrinsic;
 		file.open("distortion-right.txt", cv::FileStorage::WRITE);
 		file << "Distortion Matrix" << distCoeffs;
 	}
@@ -2303,16 +2505,16 @@ int calibrateCamerasInternal(int cam)
 		cout << "saving to left" << endl;
 		cv::FileStorage file;
 		file.open("intrinsic-left.txt", cv::FileStorage::WRITE);
-		file << "Intrinsic Matrix" << intrinsic;
+		file << "Intrinsic Matrix" << cv::Mat(intrinsic);
 		file.open("distortion-left.txt", cv::FileStorage::WRITE);
-		file << "Distortion Matrix" << distCoeffs;
+		file << "Distortion Matrix" << cv::Mat(distCoeffs);
 	}
 	else if (cameraID == FOUR_CAM)
 	{
 		cout << "saving to fourth" << endl;
 		cv::FileStorage file;
 		file.open("intrinsic-four.txt", cv::FileStorage::WRITE);
-		file << "Intrinsic Matrix" << intrinsic;
+		//file << "Intrinsic Matrix" << intrinsic;
 		file.open("distortion-four.txt", cv::FileStorage::WRITE);
 		file << "Distortion Matrix" << distCoeffs;
 	}
@@ -2321,7 +2523,7 @@ int calibrateCamerasInternal(int cam)
 		cout << "saving to fifth" << endl;
 		cv::FileStorage file;
 		file.open("intrinsic-five.txt", cv::FileStorage::WRITE);
-		file << "Intrinsic Matrix" << intrinsic;
+		//file << "Intrinsic Matrix" << intrinsic;
 		file.open("distortion-five.txt", cv::FileStorage::WRITE);
 		file << "Distortion Matrix" << distCoeffs;
 	}
@@ -2330,13 +2532,13 @@ int calibrateCamerasInternal(int cam)
 		cout << "saving to sixth" << endl;
 		cv::FileStorage file;
 		file.open("intrinsic-six.txt", cv::FileStorage::WRITE);
-		file << "Intrinsic Matrix" << intrinsic;
+		//file << "Intrinsic Matrix" << intrinsic;
 		file.open("distortion-six.txt", cv::FileStorage::WRITE);
 		file << "Distortion Matrix" << distCoeffs;
 	}
 
 
-	cout << "intrinsic matrix is " << intrinsic << endl;
+	//cout << "intrinsic matrix is " << intrinsic << endl;
 	cout << "dist matrix is " << distCoeffs << endl;
 
 	Mat imageUndistorted;
@@ -2344,12 +2546,24 @@ int calibrateCamerasInternal(int cam)
 	{
 		capture >> image;
 		resize(image, image, cv::Size(cameraResolutionWidth, cameraResolutionHeight));
-		transpose(image, image);
-		flip(image, image, 1);
-		undistort(image, imageUndistorted, intrinsic, distCoeffs);
+		//transpose(image, image);
+		//flip(image, image, 1);
+		//undistort(image, imageUndistorted, intrinsic, distCoeffs);
+		//image.convertTo(image, CV_32F);
+		//imageUndistorted.convertTo(imageUndistorted, CV_32F);
+		cv::Matx33d newK = intrinsic;
+		newK(0, 0) = 100;
+		newK(1, 1) = 100;
+		//cout << image.depth() << endl;
+		//cout << imageUndistorted.depth() << endl;
+		//cout << CV_32F << endl;
+		//cout << CV_64F << endl;
 
-		imshow("win1", image);
-		imshow("win2", imageUndistorted);
+		cv::fisheye::undistortImage(image, imageUndistorted, intrinsic, distCoeffs, newK);
+		//image.convertTo(image, CV_8U);
+		//imageUndistorted.convertTo(imageUndistorted, CV_8U);
+		imshow("image- distorted", image);
+		imshow("image- undistorted", imageUndistorted);
 		waitKey(1);
 	}
 
@@ -2363,10 +2577,10 @@ int calibrateCamerasExternal(int baseCam, int sideCam)
 	// Load the images
 	cv::VideoCapture capL(sideCam);
 	cv::VideoCapture capB(baseCam);
-	//capL.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
-	//capL.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
-	//capB.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
-	//capB.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
+	capL.set(CV_CAP_PROP_FRAME_WIDTH, 1640);
+	capL.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
+	capB.set(CV_CAP_PROP_FRAME_WIDTH, 1640);
+	capB.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
 	int frameWidth = capL.get(CV_CAP_PROP_FRAME_WIDTH);//*0.25;
 	int frameHeight = capL.get(CV_CAP_PROP_FRAME_HEIGHT);//*0.25;
 	/*
@@ -2384,7 +2598,7 @@ int calibrateCamerasExternal(int baseCam, int sideCam)
 	{
 		capL.read(rightFrame);
 		capB.read(baseFrame);
-
+		cv::Mat rectLinearBaseFrame, rectLinearRightFrame;
 
 		cvtColor(rightFrame, rightFrame, CV_RGB2GRAY);
 		cvtColor(baseFrame, baseFrame, CV_RGB2GRAY);
@@ -2398,7 +2612,12 @@ int calibrateCamerasExternal(int baseCam, int sideCam)
 		if (baseCam == BASE_CAM)
 		{
 			cout << "base is base_cam" << endl;
-			undistort(baseFrame, undistortedBaseFrame, INTRINSICCOEFFS[0], DISTORTIONCOEFFS[0]);
+			//undistort(baseFrame, undistortedBaseFrame, INTRINSICCOEFFS[0], DISTORTIONCOEFFS[0]);
+			cv::Matx33d newK1 = INTRINSICCOEFFS[0];
+			newK1(0, 0) = 100;
+			newK1(1, 1) = 100;
+			
+			//cv::fisheye::undistortImage(baseFrame, rectLinearBaseFrame, INTRINSICCOEFFS[0], DISTORTIONCOEFFS[0], newK1);
 		}
 		else if (baseCam == LEFT_CAM)
 		{
@@ -2427,7 +2646,12 @@ int calibrateCamerasExternal(int baseCam, int sideCam)
 		if (sideCam == LEFT_CAM)
 		{
 			cout << "undistorting left cam" << endl;
-			undistort(rightFrame, undistortedRightFrame, INTRINSICCOEFFS[1], DISTORTIONCOEFFS[1]);
+			//undistort(rightFrame, undistortedRightFrame, INTRINSICCOEFFS[1], DISTORTIONCOEFFS[1]);
+
+			cv::Matx33d newK2 = INTRINSICCOEFFS[1];
+			newK2(0, 0) = 100;
+			newK2(1, 1) = 100;
+			//cv::fisheye::undistortImage(rightFrame, rectLinearRightFrame, INTRINSICCOEFFS[1], DISTORTIONCOEFFS[1], newK2);
 		}
 		/*
 		else if (sideCam == FOUR_CAM)
@@ -2449,14 +2673,33 @@ int calibrateCamerasExternal(int baseCam, int sideCam)
 		*/
 
 
-		cout << "base intrinsics: " << INTRINSICCOEFFS[0] << endl;
-		cout << "left intrinsics: " << INTRINSICCOEFFS[1] << endl;
-		cout << "baseCam F length is: " << CAM_F_MAP[baseCam] << endl;
-		cout << "sideCam F length is: " << CAM_F_MAP[sideCam] << endl;
+		//cout << "base intrinsics: " << INTRINSICCOEFFS[0] << endl;
+		//cout << "left intrinsics: " << INTRINSICCOEFFS[1] << endl;
+		//cout << "baseCam F length is: " << CAM_F_MAP[baseCam] << endl;
+		//cout << "sideCam F length is: " << CAM_F_MAP[sideCam] << endl;
 
-		cv::Mat rectLinearBaseFrame = rectlinearProject(undistortedBaseFrame, 0, CAM_F_MAP[baseCam]);
-		cv::Mat rectLinearRightFrame = rectlinearProject(undistortedRightFrame, 0, CAM_F_MAP[sideCam]);
+		
+		
 
+		//cout << image.depth() << endl;
+		//cout << imageUndistorted.depth() << endl;
+		//cout << CV_32F << endl;
+		//cout << CV_64F << endl;
+		//double balance = 1.0;
+		//cv::fisheye::estimateNewCameraMatrixForUndistortRectify(INTRINSICCOEFFS[0],DISTORTIONCOEFFS[0], FRAMES[0].size(), cv::noArray(), newK, balance);
+		
+
+		
+
+		cv::resize(rightFrame, rightFrame, cv::Size(1000, 800));
+		cv::resize(baseFrame, baseFrame, cv::Size(1000, 800));
+		cv::Rect myROI(100, 0, 800, 800);
+
+		cv::Mat croppedImageB = baseFrame(myROI);
+		cv::Mat croppedImageL = rightFrame(myROI);
+
+		rectLinearBaseFrame = rectlinearProject(croppedImageB, 0, 40);
+		rectLinearRightFrame = rectlinearProject(croppedImageL, 0, 90);
 
 		baseFrame = rectLinearBaseFrame;
 		rightFrame = rectLinearRightFrame;

@@ -616,8 +616,8 @@ int Test::testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo) {
 				FONT_HERSHEY_DUPLEX, 0.8, cvScalar(0, 144, 255), 1, CV_AA);
 			ResultFinal[0] = color_img;
 			if (!stitchVideo){
-				imshow("cropped Result", color_img);
-				waitKey(0);
+				//imshow("cropped Result", color_img);
+				//waitKey(0);
 				MM->writeStaticFrames(ResultFinal, 1, preprocess + "/FinalStitchedResult");
 				break;
 			}
