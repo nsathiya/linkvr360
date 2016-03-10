@@ -90,6 +90,7 @@ std::vector<cv::Mat> INTRINSICCOEFFS(NO_OF_CAMS);
 std::vector<cv::Mat> EXTRINSICCOEFFS(NO_OF_CAMS);
 std::vector<cv::Mat> DISTORTIONCOEFFS(NO_OF_CAMS);
 std::vector<cv::Mat> RESULTS(NO_OF_CAMS);
+std::vector<cv::Mat> THRESHOLDED(NO_OF_CAMS);
 std::vector<std::string> PREPROCESS_FRAMES_PATH(NO_OF_CAMS);
 std::vector<std::string> RESULTS_FRAMES_PATH(1);
 std::vector<float> FOCAL(NO_OF_CAMS);
@@ -169,9 +170,9 @@ int main() {
 void setup()
 {
 
-	FOCAL[0] = CAM_F_MAP[BASE_CAM] = 551.164;
-	FOCAL[1] = CAM_F_MAP[LEFT_CAM] = 551.400;
-	FOCAL[2] = CAM_F_MAP[RIGHT_CAM] = 326.38;
+	FOCAL[0] = CAM_F_MAP[BASE_CAM] = 3.18; // 551.164;
+	FOCAL[1] = CAM_F_MAP[LEFT_CAM] = 3.2; //551.400;
+	FOCAL[2] = CAM_F_MAP[RIGHT_CAM] = 3.16; // 326.38;
 	//FOCAL[3] = CAM_F_MAP[FOUR_CAM] = 176.9511;
 	//FOCAL[4] = CAM_F_MAP[FIFTH_CAM] = 175.2695;
 	//CAM_F_MAP[BACK_CAM] = 175.2695;
@@ -375,7 +376,7 @@ int showFrames()
 
 		
 		cv::resize(FRAMES[0], FRAMES[0], cv::Size(900, 500));
-		cv::resize(FRAMES[1], FRAMES[1], cv::Size(900, 500));
+		cv::resize(FRAMES[2], FRAMES[2], cv::Size(900, 500));
 		cv::Rect myROI(50, 0, 800, 500), myROI2(150,150, 500, 500);
 		
 		cv::Mat row1 = cv::Mat::ones(150, 800, FRAMES[0].type());  // 3 cols
@@ -385,15 +386,15 @@ int showFrames()
 		croppedImageB.push_back(row1);
 		croppedImageL.push_back(row1);
 		croppedImageB.push_back(FRAMES[0](myROI));
-		croppedImageL.push_back(FRAMES[1](myROI));
+		croppedImageL.push_back(FRAMES[2](myROI));
 		croppedImageB.push_back(row1);
 		croppedImageL.push_back(row1);
 
 		imshow("before rectilinear - B", croppedImageB);
 		imshow("before rectilinear - L", croppedImageL);
 
-		cv::Mat rectLinearBaseFrame = rectlinearProject(croppedImageB, 0,40);
-		cv::Mat rectLinearRightFrame = rectlinearProject(croppedImageL, 0, 90);
+		cv::Mat rectLinearBaseFrame = rectlinearProject(croppedImageB, 0,FOCAL[0]);
+		cv::Mat rectLinearRightFrame = rectlinearProject(croppedImageL, 0, FOCAL[2]);
 
 		if (waitKey(100) == 110)
 			break;
@@ -463,7 +464,8 @@ cv::Mat rectlinearProject(Mat ImgToCalibrate, bool INV_FLAG, float F)
 				//interpolateBilinear(Img, current_pos, top_left, destPic.at<uchar>(y, x));
 			}
 			else {//JH: added color pixels
-				interpolateBilinear(Img, current_pos, top_left, destPic.at<cv::Vec3b>(y, x));
+				destPic.at<cv::Vec3b>(y, x) = Img.at<cv::Vec3b>(top_left.y, top_left.x);
+				//interpolateBilinear(Img, current_pos, top_left, destPic.at<cv::Vec3b>(y, x));
 			}
 
 		}
@@ -500,7 +502,7 @@ cv::Point2f convert_pt(cv::Point2f point, int w, int h, int INV_FLAG, float F)
 {
 
 	//center the point at 0,0
-	float FOV = 3.2;
+	float FOV = F; //3.2;
 	// Polar angles
 	//cv::Point2f pc(point.x - w / 2, point.y - h / 2);
 	float theta = 2.0 * 3.14159265 * (point.x / w - 0.5); // -pi to pi
@@ -759,6 +761,11 @@ int testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo) {
 	RESULTS[0] = cv::Mat(resultWidth, resultHeight+1000, useGrayScale ? CV_8UC1 : CV_8UC3);
 	RESULTS[1] = cv::Mat(resultWidth, resultHeight+1000, useGrayScale ? CV_8UC1 : CV_8UC3);
 	RESULTS[2] = cv::Mat(resultWidth, resultHeight+1000, useGrayScale ? CV_8UC1 : CV_8UC3);
+	THRESHOLDED[0] = cv::Mat(resultWidth, resultHeight + 1000, useGrayScale ? CV_8UC1 : CV_8UC3);
+	THRESHOLDED[1] = cv::Mat(resultWidth, resultHeight + 1000, useGrayScale ? CV_8UC1 : CV_8UC3);
+	THRESHOLDED[2] = cv::Mat(resultWidth, resultHeight + 1000, useGrayScale ? CV_8UC1 : CV_8UC3);
+
+
 	//RESULTS[3] = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
 	//RESULTS[4] = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
 	//outSixFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
@@ -789,7 +796,7 @@ int testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo) {
 		if (FRAMES[0].empty())
 			break;
 
-		IO->IO_cvtColor(FRAMES, CV_RGB2GRAY);
+		//IO->IO_cvtColor(FRAMES, CV_RGB2GRAY);
 		//imshow("base frame", FRAMES[0]);
 		//imshow("left frame", FRAMES[1]);
 		//imshow("right frame", FRAMES[2]);
@@ -816,19 +823,32 @@ int testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo) {
 		//cv::fisheye::undistortImage(FRAMES[0], FRAMES[0], INTRINSICCOEFFS[0], DISTORTIONCOEFFS[0], newK1);
 		//cv::fisheye::undistortImage(FRAMES[1], FRAMES[1], INTRINSICCOEFFS[1], DISTORTIONCOEFFS[1], newK2);
 
-		cv::resize(FRAMES[0], FRAMES[0], cv::Size(1000, 800));
-		cv::resize(FRAMES[1], FRAMES[1], cv::Size(1000, 800));
-		cv::resize(FRAMES[2], FRAMES[2], cv::Size(1000, 800));
+		cv::resize(FRAMES[0], FRAMES[0], cv::Size(900, 500));
+		cv::resize(FRAMES[1], FRAMES[1], cv::Size(900, 500));
+		cv::resize(FRAMES[2], FRAMES[2], cv::Size(900, 500));
+		cv::Rect myROI(50, 0, 800, 500), myROI2(150, 150, 500, 500);
 
-		cv::Rect myROI(100, 0, 800, 800);
+		cv::Mat row1 = cv::Mat::ones(150, 800, FRAMES[0].type());  // 3 cols
+		cv::Mat row2 = cv::Mat::ones(150, 800, FRAMES[0].type());  // 3 cols
+		cv::Mat croppedImageB, croppedImageL, croppedImageR;
 
-		cv::Mat croppedImageB = FRAMES[0](myROI);
-		cv::Mat croppedImageL = FRAMES[1](myROI);
-		cv::Mat croppedImageR = FRAMES[2](myROI);
+		croppedImageB.push_back(row1);
+		croppedImageL.push_back(row1);
+		croppedImageR.push_back(row1);
+		croppedImageB.push_back(FRAMES[0](myROI));
+		croppedImageL.push_back(FRAMES[1](myROI));
+		croppedImageR.push_back(FRAMES[2](myROI));
+		croppedImageB.push_back(row1);
+		croppedImageL.push_back(row1);
+		croppedImageR.push_back(row1);
 
-		cv::Mat rectLinearBaseFrame = rectlinearProject(croppedImageB, 0, 90);
-		cv::Mat	rectLinearLeftFrame = rectlinearProject(croppedImageL, 0, 90);
-		cv::Mat	rectLinearRightFrame = rectlinearProject(croppedImageR, 0, 90);
+		cv::Mat rectLinearBaseFrame = rectlinearProject(croppedImageB, 0, FOCAL[0]);
+		cv::Mat rectLinearLeftFrame = rectlinearProject(croppedImageL, 0, FOCAL[1]);
+		cv::Mat rectLinearRightFrame = rectlinearProject(croppedImageR, 0, FOCAL[2]);
+
+		rectLinearBaseFrame = rectLinearBaseFrame(myROI2);
+		rectLinearLeftFrame = rectLinearLeftFrame(myROI2);
+		rectLinearRightFrame = rectLinearRightFrame(myROI2);
 
 		//imshow("base Frame", rectLinearBaseFrame);
 		//imshow("left Frame", rectLinearRightFrame);
@@ -853,12 +873,14 @@ int testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo) {
 		}
 		//MM->writeStaticFrames(RESULTS, 1, "WarpPerspective()");
 		
-		//imshow("base frame", RESULTS[0]);
-		//imshow("left frame", RESULTS[1]);
-		//imshow("right frame", RESULTS[2]);
+		imshow("base frame", RESULTS[0]);
+		imshow("left frame", RESULTS[1]);
+		imshow("right frame", RESULTS[2]);
+		cv::waitKey(0);
+		RESULTS[0].copyTo(THRESHOLDED[0]);
+		RESULTS[1].copyTo(THRESHOLDED[1]);
+		RESULTS[2].copyTo(THRESHOLDED[2]);
 
-		//cv::waitKey(0);
-		
 		if (frameNo == 1){
 			
 			//BLENDING TEST
@@ -871,6 +893,7 @@ int testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo) {
 			//m1.setTo(1);
 			//m2 = RESULTS[1](Rect(BO->limitPt.leftXLimit, 0, RESULTS[0].cols - BO->limitPt.leftXLimit, RESULTS[0].rows));
 			//m2.setTo(1);
+			IO->IO_cvtColor(RESULTS, CV_RGB2GRAY);
 			cv::threshold(RESULTS[0], m1, 0, 255, cv::THRESH_BINARY);
 			cv::threshold(RESULTS[1], m2, 0, 255, cv::THRESH_BINARY);
 			cv::threshold(RESULTS[2], m3, 0, 255, cv::THRESH_BINARY);
@@ -964,7 +987,7 @@ int testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo) {
 		//result = imBlended;
 		imBlended.convertTo(result, CV_8UC1);
 		//CHANGE
-		croppedImage = result(Rect(0,0, result.cols, result.rows/2));
+		croppedImage = result(Rect(250,150, 800, 400));
 
 		if (croppedImage.channels() == 3) {
 			cv::cvtColor(croppedImage, croppedImage, CV_RGB2BGR);
@@ -2691,18 +2714,33 @@ int calibrateCamerasExternal(int baseCam, int sideCam)
 
 		
 
-		cv::resize(rightFrame, rightFrame, cv::Size(1000, 800));
-		cv::resize(baseFrame, baseFrame, cv::Size(1000, 800));
-		cv::Rect myROI(100, 0, 800, 800);
+		cv::resize(rightFrame, rightFrame, cv::Size(900, 500));
+		cv::resize(baseFrame, baseFrame, cv::Size(900, 500));
+		cv::Rect myROI(50, 0, 800, 500), myROI2(150, 150, 500, 500);
 
-		cv::Mat croppedImageB = baseFrame(myROI);
-		cv::Mat croppedImageL = rightFrame(myROI);
+		cv::Mat row1 = cv::Mat::ones(150, 800, baseFrame.type());  // 3 cols
+		cv::Mat row2 = cv::Mat::ones(150, 800, baseFrame.type());  // 3 cols
+		cv::Mat croppedImageB, croppedImageL;
 
-		rectLinearBaseFrame = rectlinearProject(croppedImageB, 0, 40);
-		rectLinearRightFrame = rectlinearProject(croppedImageL, 0, 90);
+		croppedImageB.push_back(row1);
+		croppedImageL.push_back(row1);
+		croppedImageB.push_back(baseFrame(myROI));
+		croppedImageL.push_back(rightFrame(myROI));
+		croppedImageB.push_back(row1);
+		croppedImageL.push_back(row1);
+
+		imshow("before rectilinear - B", croppedImageB);
+		imshow("before rectilinear - L", croppedImageL);
+
+		rectLinearBaseFrame = rectlinearProject(croppedImageB, 0, FOCAL[0]);
+		rectLinearRightFrame = rectlinearProject(croppedImageL, 0, FOCAL[2]);
+		rectLinearBaseFrame = rectLinearBaseFrame(myROI2);
+		rectLinearRightFrame = rectLinearRightFrame(myROI2);
 
 		baseFrame = rectLinearBaseFrame;
 		rightFrame = rectLinearRightFrame;
+
+
 
 
 
