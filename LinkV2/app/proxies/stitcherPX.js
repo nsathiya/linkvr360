@@ -4,8 +4,8 @@
 const addon = require('./../../hello');
 //var mainDoc = require('../js/index');
 
-module.exports.startStitching = function (){
+module.exports.startStitching = function (image1, image2, image3){
 	console.log("Started Stitching");
-	console.log(addon.hello());
-	return 0;
+	var _buffImg = addon.hello(image1, image2, image3);
+	return _buffImg;
 }

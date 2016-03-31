@@ -41,8 +41,8 @@ void GPUOps::GO_warpPerspective(std::vector<cv::Mat> externalCoeffs, int resultH
 }
 
 void GPUOps::GO_downloadStream(std::vector<cv::Mat> &RESULTS){
-	//error statements
-
+	//error statments
+		
 	for (int i = 0; i < streams.size(); i++){
 		streams[i].enqueueDownload(RESULTFRAMES[i], RESULTS[i]);
 	}

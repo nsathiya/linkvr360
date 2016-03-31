@@ -612,11 +612,11 @@ int testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo) {
 	int resultHeight = frameHeight + 100;
 	bool record = false;
 	cout << frameWidth << " " << frameHeight << endl;
-	cv::Mat result = Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
+	cv::Mat result = Mat(resultWidth, resultHeight, useGrayScale ? CV_16UC1 : CV_16UC3);
 	if (stitchFromMemory && !stitchVideo)
 		MM = new MemoryManager(NO_OF_CAMS, PREPROCESS_FRAMES_PATH, frameHeight, frameWidth, stitchVideo);
 	if (stitchFromMemory && stitchVideo)
-		MM = new MemoryManager(1, RESULTS_FRAMES_PATH, resultHeight + 1000, resultWidth/2, stitchVideo);
+		MM = new MemoryManager(1, RESULTS_FRAMES_PATH, resultHeight, resultWidth/2, stitchVideo);
 	
 	// Move Scene to the right by 100
 	int x_offset = 400.0;
@@ -758,12 +758,12 @@ int testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo) {
 	float _totalSPF = 0;
 
 	//Initialize needed variables for GPU
-	RESULTS[0] = cv::Mat(resultWidth, resultHeight+1000, useGrayScale ? CV_8UC1 : CV_8UC3);
-	RESULTS[1] = cv::Mat(resultWidth, resultHeight+1000, useGrayScale ? CV_8UC1 : CV_8UC3);
-	RESULTS[2] = cv::Mat(resultWidth, resultHeight+1000, useGrayScale ? CV_8UC1 : CV_8UC3);
-	THRESHOLDED[0] = cv::Mat(resultWidth, resultHeight + 1000, useGrayScale ? CV_8UC1 : CV_8UC3);
-	THRESHOLDED[1] = cv::Mat(resultWidth, resultHeight + 1000, useGrayScale ? CV_8UC1 : CV_8UC3);
-	THRESHOLDED[2] = cv::Mat(resultWidth, resultHeight + 1000, useGrayScale ? CV_8UC1 : CV_8UC3);
+	RESULTS[0] = cv::Mat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC4);
+	RESULTS[1] = cv::Mat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC4);
+	RESULTS[2] = cv::Mat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC4);
+	THRESHOLDED[0] = cv::Mat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC4);
+	THRESHOLDED[1] = cv::Mat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC4);
+	THRESHOLDED[2] = cv::Mat(resultWidth, resultHeight, useGrayScale ? CV_8UC1 : CV_8UC4);
 
 
 	//RESULTS[3] = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
@@ -791,6 +791,10 @@ int testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo) {
 		//imshow("base frame", FRAMES[0]);
 		//imshow("left frame", FRAMES[1]);
 		//imshow("right frame", FRAMES[2]);
+
+		cv::imwrite("baseFrame.jpg", FRAMES[0]);
+		cv::imwrite("leftFrame.jpg", FRAMES[1]);
+		cv::imwrite("rightFrame.jpg", FRAMES[2]);
 
 		//cv::waitKey(0);
 		if (FRAMES[0].empty())
@@ -865,50 +869,92 @@ int testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo) {
 		//IO->IO_rectilinearProject(FRAMES, 0, FOCAL);
 		if (GPU){
 			GO->GO_uploadStream(FRAMES);
-			GO->GO_warpPerspective(EXTRINSICCOEFFS, resultHeight+1000, resultWidth);
+			GO->GO_warpPerspective(EXTRINSICCOEFFS, resultHeight, resultWidth);
 			GO->GO_downloadStream(RESULTS);
 		}
 		else {
-			IO->IO_warpPerspective(FRAMES, RESULTS, EXTRINSICCOEFFS, cv::Size(resultHeight+1000, resultWidth));
+			IO->IO_warpPerspective(FRAMES, RESULTS, EXTRINSICCOEFFS, cv::Size(resultHeight, resultWidth));
 		}
 		//MM->writeStaticFrames(RESULTS, 1, "WarpPerspective()");
 		
-		imshow("base frame", RESULTS[0]);
-		imshow("left frame", RESULTS[1]);
-		imshow("right frame", RESULTS[2]);
-		cv::waitKey(0);
+		//imshow("base frame", RESULTS[0]);
+		//imshow("left frame", RESULTS[1]);
+		//imshow("right frame", RESULTS[2]);
+		//cv::waitKey(0);
 		RESULTS[0].copyTo(THRESHOLDED[0]);
 		RESULTS[1].copyTo(THRESHOLDED[1]);
 		RESULTS[2].copyTo(THRESHOLDED[2]);
+		cv::vector<cv::Mat> result1split(4), result2split(4), result3split(4);
+		cv::split(RESULTS[0], result1split);
+		cv::split(RESULTS[1], result2split);
+		cv::split(RESULTS[2], result3split);
 
-		if (frameNo == 1){
+		if (frameNo != 0){
 			
 			//BLENDING TEST
 			/*imshow("0 - PreBlend", RESULTS[0]);
 			imshow("1 - PreBlend", RESULTS[1]);
 			waitKey(0);
 */
+			cout << "entering blending" << endl;
 			Mat m1, m2, m3;
 			//m1 = RESULTS[0](Rect(0, 0, BO->limitPt.rightXLimit, RESULTS[0].rows));
 			//m1.setTo(1);
 			//m2 = RESULTS[1](Rect(BO->limitPt.leftXLimit, 0, RESULTS[0].cols - BO->limitPt.leftXLimit, RESULTS[0].rows));
 			//m2.setTo(1);
-			IO->IO_cvtColor(RESULTS, CV_RGB2GRAY);
-			cv::threshold(RESULTS[0], m1, 0, 255, cv::THRESH_BINARY);
-			cv::threshold(RESULTS[1], m2, 0, 255, cv::THRESH_BINARY);
-			cv::threshold(RESULTS[2], m3, 0, 255, cv::THRESH_BINARY);
+			IO->IO_cvtColor(THRESHOLDED, CV_BGR2GRAY);
+			cv::threshold(THRESHOLDED[0], m1, 0, 255, cv::THRESH_BINARY);
+			cv::threshold(THRESHOLDED[1], m2, 0, 255, cv::THRESH_BINARY);
+			cv::threshold(THRESHOLDED[2], m3, 0, 255, cv::THRESH_BINARY);
+			cout << "thresholded" << endl;
+			cv::vector<cv::Mat> threshold1split, threshold2split, threshold3split;
+			cv::split(m1, threshold1split);
+			cv::split(m2, threshold2split);
+			cv::split(m3, threshold3split);
 
+			Mat rgba0(RESULTS[0].rows, RESULTS[0].cols, CV_8UC4, Scalar(1, 2, 3, 4));
+			Mat rgba1(RESULTS[1].rows, RESULTS[1].cols, CV_8UC4, Scalar(1, 2, 3, 4));
+			Mat rgba2(RESULTS[2].rows, RESULTS[2].cols, CV_8UC4, Scalar(1, 2, 3, 4));
+
+			Mat bgr0(rgba0.rows, rgba0.cols, CV_8UC3);
+			Mat bgr1(rgba1.rows, rgba1.cols, CV_8UC3);
+			Mat bgr2(rgba2.rows, rgba2.cols, CV_8UC3);
+
+	
+			// forming an array of matrices is a quite efficient operation,
+			// because the matrix data is not copied, only the headers
+			
+			Mat in0[] = { RESULTS[0], threshold1split[0] };
+			Mat in1[] = { RESULTS[1], threshold2split[0] };
+			Mat in2[] = { RESULTS[2], threshold3split[0] };
+
+			// rgba[0] -> bgr[2], rgba[1] -> bgr[1],
+			// rgba[2] -> bgr[0], rgba[3] -> alpha[0]
+			int from_to[] = { 0, 0, 1, 1, 2, 2, 3, 3 };
+			mixChannels(in0, 2, &rgba0, 1, from_to, 4);
+			mixChannels(in1, 2, &rgba1, 1, from_to, 4);
+			mixChannels(in2, 2, &rgba2, 1, from_to, 4);
+
+			cout << "number of channels are " << rgba0.channels() << endl;
+
+			//cv::imwrite("resultBeforeBlend0.png", rgba0);
+			//cv::imwrite("resultBeforeBlend1.png", rgba1);
+			//cv::imwrite("resultBeforeBlend2.png", rgba2);
+
+			system("enblend resultBeforeBlend0.png resultBeforeBlend1.png resultBeforeBlend2.png ");
 			//imshow("0 - Mask", m1);
 			//imshow("1 - Mask", m2);
 			//imshow("2 - Mask", m3);
 			//waitKey(0);
+			
+			/*SAMPLE ENBLEND
 
 			cv::Mat bothMasks = m1 | m2 | m3;
 			//cv::Mat ampersandMasks = m1 & m2 & m3;
 			cv::Mat noMask = 255 - bothMasks;
 
 			//imshow("0 - Both Mask", bothMasks);
-			//imshow("0 - Ampersand Mask", ampersandMasks);
+			////imshow("0 - Ampersand Mask", ampersandMasks);
 			//imshow("0 - No Mask", noMask);
 			//waitKey(0);
 
@@ -919,10 +965,6 @@ int testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo) {
 			cv::Mat border2 = 255 - border(m2);
 			cv::Mat border3 = 255 - border(m3);
 
-			//cv::imshow("0 - border1", border1);
-			//cv::imshow("1 - border2", border2);
-			//cv::imshow("2 - border3", border3);
-			//waitKey(0);
 
 			cv::Mat dist1, dist2, dist3;
 			cv::distanceTransform(border1, dist1, CV_DIST_L2, 3);
@@ -937,10 +979,6 @@ int testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo) {
 			cv::minMaxLoc(dist3, &min, &max, &minLoc, &maxLoc, m3&(dist3 > 0));
 			dist3 = dist3* 1.0 / max;
 
-			/*cv::imshow("0 - Distance", dist1);
-			cv::imshow("1 - Distance", dist2);
-			waitKey(0);
-			*/
 			rawAlpha.copyTo(dist1Masked, noMask);
 			dist1.copyTo(dist1Masked, m1);
 			rawAlpha.copyTo(dist1Masked, m1&(255 - m2 - m3));
@@ -953,45 +991,78 @@ int testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo) {
 			dist3.copyTo(dist3Masked, m3);
 			rawAlpha.copyTo(dist3Masked, m3&(255 - m1 - m2));
 
-			/*cv::imshow("0 - Distance Masked", dist1Masked);
-			cv::imshow("1 - Distance Masked", dist2Masked);
-			cv::imshow("3 - Distance Masked", dist3Masked);
-			waitKey(0);*/
 
 			blendMaskSum = dist1Masked + dist2Masked + dist3Masked;
 			//cv::imshow("0 - BlendMaskSum", blendMaskSum);
 			//waitKey(0);
-
+			*/
 		}
 
+		/*SAMPLE ENBLEND
 		cv::Mat im1Float, im2Float, im3Float; 
 		RESULTS[0].convertTo(im1Float, dist1Masked.type());
 		RESULTS[1].convertTo(im2Float, dist2Masked.type());
 		RESULTS[2].convertTo(im3Float, dist3Masked.type());
-		cv::Mat im1Alpha = dist1Masked.mul(im1Float);
-		cv::Mat im2Alpha = dist2Masked.mul(im2Float);
-		cv::Mat im3Alpha = dist3Masked.mul(im3Float);
 
-		/*cv::imshow("0 - Blended", im1Alpha/255.0);
-		cv::imshow("1 - Blended", im2Alpha/255.0);
-		cv::imshow("2 - Blended", im3Alpha/ 255.0);
-		waitKey(0);*/
+		//split channels for each picture
+		std::vector<cv::Mat> channels1, channels2, channels3;
+		cv::split(im1Float, channels1);
+		cv::split(im2Float, channels2);
+		cv::split(im3Float, channels3);
 
-		cv::Mat imBlended = (im1Alpha + im2Alpha + im3Alpha) / blendMaskSum;
+		cv::Mat im1AlphaB = dist1Masked.mul(channels1[0]);
+		cv::Mat im1AlphaG = dist1Masked.mul(channels1[1]);
+		cv::Mat im1AlphaR = dist1Masked.mul(channels1[2]);
 
-		/*cv::imshow("0 - Blended and Merged", imBlended / 255.0);
-		waitKey(0);
-*/
+		cv::Mat im2AlphaB = dist2Masked.mul(channels2[0]);
+		cv::Mat im2AlphaG = dist2Masked.mul(channels2[1]);
+		cv::Mat im2AlphaR = dist2Masked.mul(channels2[2]);
 
+		cv::Mat im3AlphaB = dist3Masked.mul(channels3[0]);
+		cv::Mat im3AlphaG = dist3Masked.mul(channels3[1]);
+		cv::Mat im3AlphaR = dist3Masked.mul(channels3[2]);
+
+		cv::Mat imBlendedB = (im1AlphaB + im2AlphaB + im3AlphaB) / blendMaskSum;
+		cv::Mat imBlendedG = (im1AlphaG + im2AlphaG + im3AlphaG) / blendMaskSum;
+		cv::Mat imBlendedR = (im1AlphaR + im2AlphaR + im3AlphaR) / blendMaskSum;
+		std::vector<cv::Mat> channelsBlended;
+		channelsBlended.push_back(imBlendedB);
+		channelsBlended.push_back(imBlendedG);
+		channelsBlended.push_back(imBlendedR);
+		//cout << imBlendedB << endl;
+		/*threshold(imBlendedB, imBlendedB, 255.0, 255.0, THRESH_TRUNC);
+		threshold(imBlendedG, imBlendedG, 255.0, 255.0, THRESH_TRUNC);
+		threshold(imBlendedR, imBlendedR, 255.0, 255.0, THRESH_TRUNC);
+
+		imshow("blendedB", imBlendedB/255);
+		imshow("blendedG", imBlendedG/255);
+		imshow("blendedR", imBlendedR/255);
+		cv::waitKey(0);
+
+
+
+		cv::Mat imBlended; 
+		cv::merge(channelsBlended, imBlended);
+
+		
+		
 		//BO->BO_alphaBlend(RESULTS, 0.3, result);
 		//result = imBlended;
-		imBlended.convertTo(result, CV_8UC1);
+		imBlended.convertTo(result, CV_8UC3);
+		//cv::Mat resultThres;
+		//threshold(result, resultThres, 255, 255, THRESH_BINARY);
+		//result.convertTo(result, CV_16UC3);
+		//cout << result << endl;
 		//CHANGE
+		
+		SAMPLE BLEND END*/
+
+		result = cv::imread("a.tif");
 		croppedImage = result(Rect(250,150, 800, 400));
 
-		if (croppedImage.channels() == 3) {
+		/*if (croppedImage.channels() == 3) {
 			cv::cvtColor(croppedImage, croppedImage, CV_RGB2BGR);
-		}
+		}*/
 
 		if (stitchFromMemory){
 			std::vector<cv::Mat> ResultFinal(1);

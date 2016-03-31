@@ -31,15 +31,16 @@ class Test
 public:
 	Test(bool showPic);
 	~Test();
-	int getWorld();
+	cv::Mat getWorld(cv::Mat pic1, cv::Mat pic2, cv::Mat pic3);
 
 private:
 	int testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo);
+	int testingFunction2(bool GPU, bool stitchFromMemory, bool stitchVideo);
 	cv::Mat border(cv::Mat mask);
 	void setup();
 	bool testPic;
-	
-
+	cv::Mat rectlinearProject(cv::Mat ImgToCalibrate, bool INV_FLAG, float F);
+	cv::Point2f convert_pt(cv::Point2f point, int w, int h, int INV_FLAG, float F);
 	
 };
 

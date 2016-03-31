@@ -15,7 +15,7 @@
 				'cflags_cc!': ['-fno-rtti'],
 				'cflags_cc+': ['-frtti']
 			}]],
-      "include_dirs": ['$(OPENCV_DIR)/include'],
+      "include_dirs": ['$(OPENCV_DIR)/include', "<!(node -e \"require('nan')\")"],
       'library_dirs': ['$(OPENCV_DIR)/x64/vc12/lib'], 
       'libraries':    ['-lopencv_calib3d2410d.lib',
 					 	'-lopencv_core2410d.lib',
@@ -46,7 +46,7 @@
 			            'RuntimeTypeInfo': 'false',
 			            'ExceptionHandling': '0',
 			            'AdditionalOptions': [
-			              '/MP /EHsc', '/MTd'
+			              '/MP /EHsc', '/MDd'
 			            ],
 			          },
 			          'VCLibrarianTool': {

@@ -13,8 +13,17 @@ Test::~Test()
 {
 }
 
-int Test::getWorld(){
+cv::Mat _pic1, _pic2, _pic3, _picResult;
 
+cv::Mat Test::getWorld(cv::Mat pic1, cv::Mat pic2, cv::Mat pic3){
+
+	//cv::imwrite("testPicturesaveFromc++1.jpg", pic1);
+	//cv::imwrite("testPicturesaveFromc++2.jpg", pic2);
+	//cv::imwrite("testPicturesaveFromc++3.jpg", pic3);
+	
+	_pic1 = pic1;
+	_pic2 = pic2;
+	_pic3 = pic3;
 	if(testPic){
 		// std::cout << "Test1" << std::endl;
 		// cv::Mat ten = cv::Mat(500, 500, CV_8SC3);
@@ -31,7 +40,7 @@ int Test::getWorld(){
 
 		if (!GetCurrentDir(cCurrentPath, sizeof(cCurrentPath)))
 		{
-			return errno;
+			return _picResult; //errno;
 		}
 
 		cCurrentPath[sizeof(cCurrentPath) - 1] = '\0'; /* not really required */
@@ -70,10 +79,10 @@ int Test::getWorld(){
 		cv::imwrite("ten.png", ten);*/
 
 		setup();
-		testingFunction(true, true, false);
+		testingFunction2(true, true, false);
 	}
 	
-	return 0;
+	return _picResult;
 }
 
 const int BASE_CAM = 1;  //0;
@@ -84,9 +93,9 @@ const int FIFTH_CAM = 2;
 const int BACK_CAM = 5;
 const int NO_OF_CAMS = 3;
 
-std::string videoPath = "samples";
+std::string videoPath = "../LinkV2/samples"; //"samples"; 
 std::string preprocess = videoPath + "/preprocess";
-std::string calibrationPath = "calibration";
+std::string calibrationPath = "../LinkV2/calibration"; //"calibration";
 std::string internalCalibrationPath = calibrationPath + "/internal";
 std::string externalCalibrationPath = calibrationPath + "/external";
 std::string camLOutput = preprocess + "/Cam_L_Stream.avi";
@@ -118,13 +127,14 @@ std::vector<cv::Point2f> rightImage;
 cv::Mat rightFrame, baseFrame;
 
 /// Control grayScale option
-bool useGrayScale = true;
+bool useGrayScale = false;
 cv::Mat border(cv::Mat mask);
 std::vector<cv::Mat> FRAMES(NO_OF_CAMS);
 std::vector<cv::Mat> INTRINSICCOEFFS(NO_OF_CAMS);
 std::vector<cv::Mat> EXTRINSICCOEFFS(NO_OF_CAMS);
 std::vector<cv::Mat> DISTORTIONCOEFFS(NO_OF_CAMS);
 std::vector<cv::Mat> RESULTS(NO_OF_CAMS);
+std::vector<cv::Mat> THRESHOLDED(NO_OF_CAMS);
 std::vector<std::string> PREPROCESS_FRAMES_PATH(NO_OF_CAMS);
 std::vector<std::string> RESULTS_FRAMES_PATH(1);
 std::vector<float> FOCAL(NO_OF_CAMS);
@@ -132,9 +142,9 @@ std::vector<float> FOCAL(NO_OF_CAMS);
 void Test::setup()
 {
 
-	FOCAL[0] = CAM_F_MAP[BASE_CAM] = 395.164;
-	FOCAL[1] = CAM_F_MAP[LEFT_CAM] = 422.400;
-	FOCAL[2] = CAM_F_MAP[RIGHT_CAM] = 326.38;
+	FOCAL[0] = CAM_F_MAP[BASE_CAM] = 3.18; //395.164;
+	FOCAL[1] = CAM_F_MAP[LEFT_CAM] = 3.2; //422.400;
+	FOCAL[2] = CAM_F_MAP[RIGHT_CAM] = 3.16; //326.38;
 	//FOCAL[3] = CAM_F_MAP[FOUR_CAM] = 176.9511;
 	//FOCAL[4] = CAM_F_MAP[FIFTH_CAM] = 175.2695;
 	//CAM_F_MAP[BACK_CAM] = 175.2695;
@@ -439,7 +449,10 @@ int Test::testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo) {
 		std::cout << "Getting Files to stitch..." << std::endl;
 
 		if (stitchFromMemory && !stitchVideo){
-			MM->readFrames(FRAMES, camPicPrefix);
+			//MM->readFrames(FRAMES, camPicPrefix);
+			FRAMES[0] = _pic1; 
+			FRAMES[1] = _pic2;
+			FRAMES[2] = _pic3;
 		}
 		else {
 			CO->CO_captureFrames(FRAMES);
@@ -451,7 +464,7 @@ int Test::testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo) {
 
 		if (FRAMES[0].empty())
 			break;
-		std::cout << "Converting to color..." << std::endl;
+		std::cout << "Converting color..." << std::endl;
 		IO->IO_cvtColor(FRAMES, CV_RGB2GRAY);
 		//IO->IO_resize(FRAMES, cv::Size(frameWidth, frameHeight));
 		//IO->IO_transpose(FRAMES);
@@ -572,6 +585,7 @@ int Test::testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo) {
 			//waitKey(0);
 
 		}
+		std::cout << "Finished setting up blend template" << std::endl;
 		/*imshow("frame1", RESULTS[0]);
 		imshow("frame2", RESULTS[1]);
 		imshow("frame3", RESULTS[2]);
@@ -602,11 +616,15 @@ int Test::testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo) {
 		//CHANGE
 		/*imshow("result", result);
 		cv::waitKey(0);*/
+		std::cout << "FInsihed blending" << std::endl;
 		croppedImage = result(Rect(0, 0, result.cols, result.rows / 2));
 
+		std::cout << "finished cropping" << std::endl;
 		if (croppedImage.channels() == 3) {
 			cv::cvtColor(croppedImage, croppedImage, CV_RGB2BGR);
 		}
+
+		_picResult = croppedImage;
 
 		if (stitchFromMemory){
 			std::vector<cv::Mat> ResultFinal(1);
@@ -618,7 +636,9 @@ int Test::testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo) {
 			if (!stitchVideo){
 				//imshow("cropped Result", color_img);
 				//waitKey(0);
+				std::cout << "saving pciture" << std::endl;
 				MM->writeStaticFrames(ResultFinal, 1, preprocess + "/FinalStitchedResult");
+				std::cout << "saved" << std::endl;
 				break;
 			}
 			else {
@@ -626,7 +646,9 @@ int Test::testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo) {
 			}
 		}
 		else {
+			std::cout << "Trying to show cropped image" << std::endl;
 			imshow("cropped Result", croppedImage);
+			std::cout << "image shown" << std::endl;
 		}
 
 
@@ -641,6 +663,7 @@ int Test::testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo) {
 		float _secsForWhileLoop = (float)(_secsPerCycle * _WhileLoopDiff);
 		cout << "secs for Frame " << frameNo << " is " << _secsForWhileLoop << endl;
 		_totalSPF = _totalSPF + _secsForWhileLoop;
+		std::cout << "calculated time info" << std::endl;
 
 		if ((frameNo % 30) == 0)
 		{
@@ -661,6 +684,7 @@ int Test::testingFunction(bool GPU, bool stitchFromMemory, bool stitchVideo) {
 	delete IO;
 	delete GO;
 	delete BO;
+	std::cout << "returning" << std::endl;
 	return 1;
 }
 
@@ -676,4 +700,446 @@ cv::Mat Test::border(cv::Mat mask)
 	cv::magnitude(gx, gy, border);
 
 	return border > 100;
+}
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int Test::testingFunction2(bool GPU, bool stitchFromMemory, bool stitchVideo) {
+
+	std::string method = "w/o GPU";
+	if (GPU)
+		method = "w GPU";
+
+	cout << "Stitching " + method << endl;
+	cout << "Stitching from memory: " << stitchFromMemory << endl;
+	if (stitchFromMemory)
+		cout << "If stitch from memory, stitch video: " << stitchVideo << endl;
+
+	std::vector<int> cameraPorts(NO_OF_CAMS);
+	cameraPorts[0] = BASE_CAM;
+	cameraPorts[1] = LEFT_CAM;
+	cameraPorts[2] = RIGHT_CAM;
+	//cameraPorts[3] = FOUR_CAM;
+	//cameraPorts[4] = FIFTH_CAM;
+	CameraOps *CO = new CameraOps(cameraPorts, PREPROCESS_FRAMES_PATH, stitchVideo);
+	ImageOps *IO = new ImageOps();
+	GPUOps *GO = GPU ? new GPUOps(NO_OF_CAMS) : NULL;
+	BlenderOps *BO = new BlenderOps();
+	MemoryManager *MM;
+
+	cv::VideoWriter outputVideo;
+
+	std::vector<cv::Point2f> scene_cornersLeft, scene_cornersRight, scene_cornersBase, scene_cornersFour, scene_cornersFive, scene_cornersSix, scene_corners;
+	
+	double Brightness;
+	double Contrast;
+	double Saturation;
+	double Gain;
+
+	Brightness = CO->CO_getProp(CV_CAP_PROP_BRIGHTNESS, 0);
+	Contrast = CO->CO_getProp(CV_CAP_PROP_CONTRAST, 0);
+	Saturation = CO->CO_getProp(CV_CAP_PROP_SATURATION, 0);
+	Gain = CO->CO_getProp(CV_CAP_PROP_GAIN, 0);
+
+	cout << "Brightness: " << Brightness;
+	cout << "Contrast: " << Contrast;
+	cout << "Saturation: " << Saturation;
+	cout << "Gain: " << Gain;
+
+	CO->CO_setProp(CV_CAP_PROP_BRIGHTNESS, Brightness);
+	CO->CO_setProp(CV_CAP_PROP_CONTRAST, Contrast);
+	CO->CO_setProp(CV_CAP_PROP_SATURATION, Saturation);
+	CO->CO_setProp(CV_CAP_PROP_GAIN, Gain);
+	CO->CO_setProp(CV_CAP_PROP_FRAME_WIDTH, 1640);
+	CO->CO_setProp(CV_CAP_PROP_FRAME_HEIGHT, 1080);
+
+
+	int frameWidth = CO->CO_getProp(CV_CAP_PROP_FRAME_WIDTH, 0); // *0.25;
+	int frameHeight = CO->CO_getProp(CV_CAP_PROP_FRAME_HEIGHT, 0); // *0.25;
+	int resultWidth = frameWidth * 2;
+	int resultHeight = frameHeight + 100;
+	bool record = false;
+	cout << frameWidth << " " << frameHeight << endl;
+	cv::Mat result = Mat(resultWidth, resultHeight, useGrayScale ? CV_16UC1 : CV_16UC3);
+	if (stitchFromMemory && !stitchVideo)
+		MM = new MemoryManager(NO_OF_CAMS, PREPROCESS_FRAMES_PATH, frameHeight, frameWidth, stitchVideo);
+	if (stitchFromMemory && stitchVideo)
+		MM = new MemoryManager(1, RESULTS_FRAMES_PATH, resultHeight, resultWidth/2, stitchVideo);
+	
+	// Move Scene to the right by 100
+	int x_offset = 400.0;
+	float y_offset = 100.0;
+	float z_offset = 100.0;
+	float transdata[] = { 1.0, 0.0, x_offset, 0.0, 1.0, y_offset, 0.0, 0.0, 1.0 };
+	cv::Mat trans(3, 3, CV_32FC1, transdata);
+	cout << "HR: " << HR << endl;
+	EXTRINSICCOEFFS[0] = trans;
+
+	Mat HR_m = HR.clone();
+	Mat HL_m = HL.clone();
+	HR = trans * HR;
+	HL = trans * HL;
+	H4 = trans * HR_m * H4;
+	H5 = trans * HL_m * H5;
+	//H6 = trans * HL_m * H5 * H6;
+
+	cout << "finished getting matrix" << endl;
+
+	CO->CO_captureFrames(FRAMES);
+
+	if (FRAMES[0].cols == 0) {
+		cout << "Error reading file " << endl;
+		return -1;
+	}
+
+	//IO->IO_resize(FRAMES, cv::Size(frameWidth, frameHeight));
+	//IO->IO_transpose(FRAMES);
+	//IO->IO_flip(FRAMES, 1);
+	//IO->IO_undistort(FRAMES, INTRINSICCOEFFS, DISTORTIONCOEFFS);
+
+	
+	// Use the Homography Matrix to warp the images
+	scene_corners.clear();
+	scene_cornersBase.push_back(Point2f(0.0, 0.0));
+	scene_cornersBase.push_back(Point2f(FRAMES[0].cols, 0.0));
+	scene_cornersBase.push_back(Point2f(0.0, FRAMES[0].rows));
+	scene_cornersBase.push_back(Point2f(FRAMES[0].cols, FRAMES[0].rows));
+	scene_cornersLeft.push_back(Point2f(0.0, 0.0));
+	scene_cornersLeft.push_back(Point2f(FRAMES[1].cols, 0.0));
+	scene_cornersLeft.push_back(Point2f(0.0, FRAMES[1].rows));
+	scene_cornersLeft.push_back(Point2f(FRAMES[1].cols, FRAMES[1].rows));
+	scene_cornersRight.push_back(Point2f(0.0, 0.0));
+	scene_cornersRight.push_back(Point2f(FRAMES[2].cols, 0.0));
+	scene_cornersRight.push_back(Point2f(0.0, FRAMES[2].rows));
+	scene_cornersRight.push_back(Point2f(FRAMES[2].cols, FRAMES[2].rows));
+
+	perspectiveTransform(scene_cornersBase, scene_cornersBase, trans);
+	perspectiveTransform(scene_cornersLeft, scene_cornersLeft, HL);
+	perspectiveTransform(scene_cornersRight, scene_cornersRight, HR);
+
+	//Store useful information for Image limits
+	int leftLimit, baseLeftLimit, baseRightLimit, rightLimit, fourLimit, fifthLimit, sixLimit;
+
+	//fifthLimit = scene_cornersFive[1].x;
+	////sixLimit = scene_cornersSix[1].x;
+	leftLimit = scene_cornersLeft[1].x;
+	baseLeftLimit = x_offset;
+	//baseRightLimit = x_offset + FRAMES[0].cols;
+	//rightLimit = scene_cornersRight[0].x;
+	//fourLimit = scene_cornersFour[0].x;
+	Mat croppedImage;
+	BO->limitPt.leftXLimit = leftLimit;
+	BO->limitPt.rightXLimit = baseLeftLimit;
+
+	//for cropping final result PLEASE REDO
+	cv::Point topLeft, topRight, bottomLeft, bottomRight;
+	int bottomLowerHeight, rightSmallerWidth, croppedWidth, croppedHeight;
+	topLeft.y = scene_cornersLeft[0].y;
+	topLeft.x = scene_cornersLeft[0].x;
+	topRight.y = scene_cornersBase[1].y;
+	topRight.x = scene_cornersBase[1].x;
+	bottomLeft.y = scene_cornersLeft[2].y;
+	bottomLeft.x = scene_cornersLeft[2].x;
+	bottomRight.y = scene_cornersBase[3].y;
+	bottomRight.x = scene_cornersBase[3].x;
+
+	if (topLeft.y < 0)
+		topLeft.y = 0;
+	if (topLeft.x < 0)
+		topLeft.x = 0;
+	if (topRight.y < 0)
+		topRight.y = 0;
+	if (topRight.x > result.cols)
+		topRight.x = result.cols;
+	if (bottomRight.y > result.rows)
+		bottomRight.y = result.rows;
+	if (bottomRight.x > result.cols)
+		bottomRight.x = result.cols;
+	if (bottomLeft.y > result.rows)
+		bottomLeft.y = result.rows;
+	if (bottomLeft.x < 0)
+		bottomLeft.x = 0;
+
+	(bottomLeft.y < bottomRight.y) ? bottomLowerHeight = bottomLeft.y : bottomLowerHeight = bottomRight.y;
+	(topRight.x < bottomRight.x) ? rightSmallerWidth = topRight.x : rightSmallerWidth = bottomRight.x;
+	(topLeft.x < bottomLeft.x) ? topLeft.x = bottomLeft.x : topLeft.x = topLeft.x;
+	(topLeft.y < topRight.y) ? topLeft.y = topRight.y : topLeft.y = topLeft.y;
+	croppedWidth = rightSmallerWidth - topLeft.x;
+	croppedHeight = bottomLowerHeight - topLeft.y;
+
+	//Timer Info
+	int _frequency = getTickFrequency();
+	float _secsPerCycle = (float)1 / _frequency;
+	int frameNo = 0;
+	float _totalSPF = 0;
+
+	//Initialize needed variables for GPU
+	RESULTS[0] = cv::Mat(resultWidth, resultHeight, CV_8UC3);
+	RESULTS[1] = cv::Mat(resultWidth, resultHeight, CV_8UC3);
+	RESULTS[2] = cv::Mat(resultWidth, resultHeight, CV_8UC3);
+	THRESHOLDED[0] = cv::Mat(resultWidth, resultHeight, CV_8UC3);
+	THRESHOLDED[1] = cv::Mat(resultWidth, resultHeight, CV_8UC3);
+	THRESHOLDED[2] = cv::Mat(resultWidth, resultHeight, CV_8UC3);
+
+
+	//RESULTS[3] = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
+	//RESULTS[4] = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
+	//outSixFrame = cv::Mat(resultWidth, resultHeight + 600, useGrayScale ? CV_8UC1 : CV_8UC3);
+	//Start processing
+	cout << "trans: " << trans << endl;
+	cout << "HL: " << HL << endl;
+	cout << "HR: " << HR << endl;
+	
+	cout << "Base array extrinsic: " << EXTRINSICCOEFFS[0] << endl;
+	cout << "Left array extrinsic: " << EXTRINSICCOEFFS[1] << endl;
+	cout << "right array extrinsic: " << EXTRINSICCOEFFS[2] << endl;
+	
+	cv::Mat dist1Masked, dist2Masked, dist3Masked, blendMaskSum;
+
+	while (1)
+	{
+		frameNo++;
+		int _startWhileLoop = (int)getTickCount();
+
+		if (stitchFromMemory && !stitchVideo){
+			FRAMES[0] = _pic1; 
+			FRAMES[1] = _pic2;
+			FRAMES[2] = _pic3;
+		}
+		else {
+			cout << "capturing frames" << endl;
+			CO->CO_captureFrames(FRAMES);
+		}
+		//imshow("base frame", FRAMES[0]);
+		//imshow("left frame", FRAMES[1]);
+		//imshow("right frame", FRAMES[2]);
+
+		cv::imwrite("baseFrame.jpg", FRAMES[0]);
+		cv::imwrite("leftFrame.jpg", FRAMES[1]);
+		cv::imwrite("rightFrame.jpg", FRAMES[2]);
+
+		//cv::waitKey(0);
+		if (FRAMES[0].empty())
+			break;
+		
+		cv::Matx33d newK1 = INTRINSICCOEFFS[0];
+		newK1(0, 0) = 200;
+		newK1(1, 1) = 300;
+		cv::Matx33d newK2 = INTRINSICCOEFFS[1];
+		newK2(0, 0) = 200;
+		newK2(1, 1) = 300;
+
+		cv::resize(FRAMES[0], FRAMES[0], cv::Size(900, 500));
+		cv::resize(FRAMES[1], FRAMES[1], cv::Size(900, 500));
+		cv::resize(FRAMES[2], FRAMES[2], cv::Size(900, 500));
+		cv::Rect myROI(50, 0, 800, 500), myROI2(150, 150, 500, 500);
+
+		cv::Mat row1 = cv::Mat::ones(150, 800, FRAMES[0].type());  // 3 cols
+		cv::Mat row2 = cv::Mat::ones(150, 800, FRAMES[0].type());  // 3 cols
+		cv::Mat croppedImageB, croppedImageL, croppedImageR;
+
+		croppedImageB.push_back(row1);
+		croppedImageL.push_back(row1);
+		croppedImageR.push_back(row1);
+		croppedImageB.push_back(FRAMES[0](myROI));
+		croppedImageL.push_back(FRAMES[1](myROI));
+		croppedImageR.push_back(FRAMES[2](myROI));
+		croppedImageB.push_back(row1);
+		croppedImageL.push_back(row1);
+		croppedImageR.push_back(row1);
+
+		cv::Mat rectLinearBaseFrame = rectlinearProject(croppedImageB, 0, FOCAL[0]);
+		cv::Mat rectLinearLeftFrame = rectlinearProject(croppedImageL, 0, FOCAL[1]);
+		cv::Mat rectLinearRightFrame = rectlinearProject(croppedImageR, 0, FOCAL[2]);
+
+		rectLinearBaseFrame = rectLinearBaseFrame(myROI2);
+		rectLinearLeftFrame = rectLinearLeftFrame(myROI2);
+		rectLinearRightFrame = rectLinearRightFrame(myROI2);
+
+		//imshow("base Frame", rectLinearBaseFrame);
+		//imshow("left Frame", rectLinearRightFrame);
+
+		FRAMES[0] = rectLinearBaseFrame;
+		FRAMES[1] = rectLinearLeftFrame;
+		FRAMES[2] = rectLinearRightFrame;
+
+		//imshow("base frame", FRAMES[0]);
+		//imshow("left frame", FRAMES[1]);
+		//imshow("right frame", FRAMES[2]);
+		//imwrite("baseframe-abouttowarp.jpg", FRAMES[0]);
+		//imwrite("leftframe-abouttowarp.jpg", FRAMES[1]);
+		//imwrite("rightframe-abouttowarp.jpg", FRAMES[2]);
+
+		//cv::waitKey(0);
+		//IO->IO_rectilinearProject(FRAMES, 0, FOCAL);
+		if (false){
+			GO->GO_uploadStream(FRAMES);
+			GO->GO_warpPerspective(EXTRINSICCOEFFS, resultHeight, resultWidth);
+			GO->GO_downloadStream(RESULTS);
+		}
+		else {
+			IO->IO_warpPerspective(FRAMES, RESULTS, EXTRINSICCOEFFS, cv::Size(resultHeight, resultWidth));
+		}
+		//MM->writeStaticFrames(RESULTS, 1, "WarpPerspective()");
+		
+		//imshow("base frame", RESULTS[0]);
+		//imshow("left frame", RESULTS[1]);
+		//imshow("right frame", RESULTS[2]);
+		//cv::waitKey(0);
+		//imwrite("baseframe-warped.jpg", RESULTS[0]);
+		//imwrite("leftframe-warped.jpg", RESULTS[1]);
+		//imwrite("rightframe-warped.jpg", RESULTS[2]);
+		RESULTS[0].copyTo(THRESHOLDED[0]);
+		RESULTS[1].copyTo(THRESHOLDED[1]);
+		RESULTS[2].copyTo(THRESHOLDED[2]);
+		cv::vector<cv::Mat> result1split(4), result2split(4), result3split(4);
+		cv::split(RESULTS[0], result1split);
+		cv::split(RESULTS[1], result2split);
+		cv::split(RESULTS[2], result3split);
+
+			cout << "entering blending" << endl;
+			Mat m1, m2, m3;
+
+			IO->IO_cvtColor(THRESHOLDED, CV_BGR2GRAY);
+			cv::threshold(THRESHOLDED[0], m1, 0, 255, cv::THRESH_BINARY);
+			cv::threshold(THRESHOLDED[1], m2, 0, 255, cv::THRESH_BINARY);
+			cv::threshold(THRESHOLDED[2], m3, 0, 255, cv::THRESH_BINARY);
+			cout << "thresholded" << endl;
+			cv::vector<cv::Mat> threshold1split, threshold2split, threshold3split;
+			cv::split(m1, threshold1split);
+			cv::split(m2, threshold2split);
+			cv::split(m3, threshold3split);
+
+			Mat rgba0(RESULTS[0].rows, RESULTS[0].cols, CV_8UC4, Scalar(1, 2, 3, 4));
+			Mat rgba1(RESULTS[1].rows, RESULTS[1].cols, CV_8UC4, Scalar(1, 2, 3, 4));
+			Mat rgba2(RESULTS[2].rows, RESULTS[2].cols, CV_8UC4, Scalar(1, 2, 3, 4));
+
+			Mat bgr0(rgba0.rows, rgba0.cols, CV_8UC3);
+			Mat bgr1(rgba1.rows, rgba1.cols, CV_8UC3);
+			Mat bgr2(rgba2.rows, rgba2.cols, CV_8UC3);
+
+	
+			// forming an array of matrices is a quite efficient operation,
+			// because the matrix data is not copied, only the headers
+			
+			Mat in0[] = { RESULTS[0], threshold1split[0] };
+			Mat in1[] = { RESULTS[1], threshold2split[0] };
+			Mat in2[] = { RESULTS[2], threshold3split[0] };
+
+			// rgba[0] -> bgr[2], rgba[1] -> bgr[1],
+			// rgba[2] -> bgr[0], rgba[3] -> alpha[0]
+			int from_to[] = { 0, 0, 1, 1, 2, 2, 3, 3 };
+			mixChannels(in0, 2, &rgba0, 1, from_to, 4);
+			mixChannels(in1, 2, &rgba1, 1, from_to, 4);
+			mixChannels(in2, 2, &rgba2, 1, from_to, 4);
+
+			cout << "number of channels are " << rgba0.channels() << endl;
+
+			cv::imwrite("resultBeforeBlend0.png", rgba0);
+			cv::imwrite("resultBeforeBlend1.png", rgba1);
+			cv::imwrite("resultBeforeBlend2.png", rgba2);
+
+			system("enblend resultBeforeBlend0.png resultBeforeBlend1.png resultBeforeBlend2.png ");
+				
+		result = cv::imread("a.tif");
+		croppedImage = result(Rect(250,150, 800, 400));
+		_picResult = croppedImage;
+
+		break;
+		if (stitchFromMemory){
+			std::vector<cv::Mat> ResultFinal(1);
+			cv::Mat color_img;
+			cv::cvtColor(croppedImage, color_img, CV_GRAY2BGR);
+			putText(color_img , "moment in the orb", cvPoint(20, 30),
+				FONT_HERSHEY_DUPLEX, 0.8, cvScalar(0,144,255),1, CV_AA);
+			ResultFinal[0] = color_img;
+			if (!stitchVideo){
+				//imshow("cropped Result", color_img);
+				//waitKey(0);
+				//MM->writeStaticFrames(ResultFinal, 1, preprocess + "/FinalStitchedResult");
+				break;
+			}
+			else {
+				MM->writeVideoFrames(ResultFinal);
+			}
+		}
+		else {
+			imshow("cropped Result", croppedImage);
+		}
+			
+	}
+	delete CO;
+	delete MM;
+	delete IO;
+	delete GO;
+	delete BO;
+	return 1;
+}
+
+cv::Mat Test::rectlinearProject(Mat ImgToCalibrate, bool INV_FLAG, float F)
+{
+	Mat Img = ImgToCalibrate;
+	int height = Img.rows;
+	int width = Img.cols;
+	Mat destPic = Mat(cv::Size(width, height), ImgToCalibrate.type(), cv::Scalar(0,0,0));
+
+	cout << width << height << endl;
+	for (int y = 0; y < height; y++)
+	{
+		for (int x = 0; x < width; x++)
+		{
+			cv::Point2f current_pos(x, y);
+			current_pos = convert_pt(current_pos, width, height, INV_FLAG, F);
+
+			cv::Point2i top_left((int)current_pos.x, (int)current_pos.y); //top left because of integer rounding
+
+			//make sure the point is actually inside the original image
+			if (top_left.x < 0 ||
+				top_left.x > width - 2 ||
+				top_left.y < 0 ||
+				top_left.y > height - 2)
+			{
+				continue;
+			}
+			if (destPic.type() == CV_8UC1) {
+				destPic.at<uchar>(y, x) = Img.at<uchar>(top_left.y, top_left.x);
+				//interpolateBilinear(Img, current_pos, top_left, destPic.at<uchar>(y, x));
+			}
+			else {//JH: added color pixels
+				destPic.at<cv::Vec3b>(y, x) = Img.at<cv::Vec3b>(top_left.y, top_left.x);
+				//interpolateBilinear(Img, current_pos, top_left, destPic.at<cv::Vec3b>(y, x));
+			}
+
+		}
+	}
+	return destPic;
+}
+
+
+cv::Point2f Test::convert_pt(cv::Point2f point, int w, int h, int INV_FLAG, float F)
+{
+
+	//center the point at 0,0
+	float FOV = F; //3.2;
+	// Polar angles
+	//cv::Point2f pc(point.x - w / 2, point.y - h / 2);
+	float theta = 2.0 * 3.14159265 * (point.x / w - 0.5); // -pi to pi
+	float phi = 3.14159265 * (point.y / h - 0.5);	// -pi/2 to pi/2
+	
+	// Vector in 3D space
+	float x = cos(phi) * sin(theta);
+	float y = cos(phi) * cos(theta);
+	float z = sin(phi);
+
+	// Calculate fisheye angle and radius
+	theta = atan2(z, x);
+	phi = atan2(sqrt(x*x + z*z), y);
+	float r = w * phi / FOV;
+	// Pixel in fisheye space
+	cv::Point2f rP;
+	rP.x =  0.5 * w + r * cos(theta);
+	rP.y =	0.5 * w + r * sin(theta);
+
+	return rP;
 }

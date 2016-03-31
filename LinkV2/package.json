@@ -1,8 +1,11 @@
 {
-  "name"    : "Stitch",
-  "version" : "0.1.0",
-  "main"    : "main.js",
+  "name": "Stitch",
+  "version": "0.1.0",
+  "main": "main.js",
   "scripts": {
-        "start": "./../node_modules/.bin/electron' ./"
-    } 
+    "start": "./../node_modules/.bin/electron' ./"
+  },
+  "dependencies": {
+    "nan": "^2.2.0"
+  }
 }
